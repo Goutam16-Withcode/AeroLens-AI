@@ -1,0 +1,13 @@
+services:
+  satquery-ai:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: satquery-ai
+    ports:
+      - "8501:8501"
+    environment:
+      - SATQUERY_ENGINE_MODE=standalone
+      - STREAMLIT_SERVER_PORT=8501
+      - STREAMLIT_SERVER_ADDRESS=0.0.0.0
+    restart: unless-stopped
