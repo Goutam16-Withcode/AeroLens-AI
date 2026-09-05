@@ -3,6 +3,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    image: satquery-ai:latest
     container_name: satquery-ai
     ports:
       - "8501:8501"

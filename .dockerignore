@@ -12,3 +12,12 @@ tests/
 .agents/
 .gemini/
 *.log
+data/full_datasets/
+data/raw/
+data/processed/
+data/*.zip
+data/*.tar.gz
+data/*.tar
+data/*.h5
+data/*.tif
+data/*.tiff
