@@ -1,0 +1,15 @@
+{
+  "dataset": "INSAT-3DS",
+  "title": "ISRO / IMD INSAT-3DS Thermal Infrared-1 (TIR1 @ 10.83 um)",
+  "samples": [
+    {
+      "id": 1,
+      "filename": "insat3ds_tir1_sample.png",
+      "preset_queries": [
+        "What this image shows and explain it.",
+        "Analyze the deep convective cloud clusters and cloud-top brightness temperatures.",
+        "Describe the regional synoptic atmospheric dynamics over the Indian subcontinent and Bay of Bengal."
+      ]
+    }
+  ]
+}

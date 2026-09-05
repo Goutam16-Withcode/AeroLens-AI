@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "satquery"
+version = "0.1.0"
+description = "Multimodal Remote Sensing Agentic Visual Query, Grounding, Change Detection & Fusion System"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "streamlit>=1.30.0",
+    "pydantic>=2.0.0",
+    "pillow>=10.0.0",
+    "opencv-python-headless>=4.8.0",
+    "numpy>=1.24.0",
+    "requests>=2.31.0",
+    "pydantic-settings>=2.0.0"
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
