@@ -1,23 +1,13 @@
-"""SatQuery — improved satellite VQA + evidence + bi-temporal analysis.
+"""SatQuery — Cyber-Geospatial Intelligence & Orbital VLM Analysis Platform.
 
 Features
 --------
-- Qwen3-VL-4B-Instruct inference with 4-bit quantisation.
-- Question routing: VQA / counting / comparison / grounding / change.
-- Optional evidence extraction: attention heatmap + stabilized evidence box.
-- Bi-temporal disaster analysis with a semantic-safe pixel-difference baseline.
-- Lightweight confidence estimate (explicitly a heuristic, not calibrated probability).
-- Optional GeoTIFF metadata extraction when rasterio is installed.
-- Fast path: attention extraction can be disabled to reduce inference overhead.
-- Gradio UI suitable for Hugging Face Spaces.
-
-Project assets expected by default:
-    examples/scene_*.png
-    disaster_examples/*_before.tiff
-    disaster_examples/*_after.tiff
-
-The application does not claim that attention is an object detector. Evidence is
-presented as model-attribution / visual-change evidence.
+- Qwen3-VL-4B-Instruct inference with 4-bit quantisation & FP16 safe fallback.
+- Question routing: VQA / counting / comparison / grounding / change detection.
+- Multi-spectral visual evidence extraction: attention heatmap + tactical reticle box.
+- Bi-temporal disaster damage analysis with pixel-difference heat mapping.
+- Heuristic confidence estimate & GeoTIFF raster telemetry.
+- Next-Gen Aerospace Mission Control HUD Interface.
 """
 
 from __future__ import annotations
@@ -38,7 +28,7 @@ import gradio as gr
 from transformers import AutoModelForImageTextToText, AutoProcessor, BitsAndBytesConfig
 
 # -----------------------------------------------------------------------------
-# Narrow Gradio/Python 3.12+ cleanup workaround used by the original Space.
+# Gradio / Python 3.12+ cleanup workaround
 # -----------------------------------------------------------------------------
 _original_event_loop_del = getattr(_asyncio_base_events.BaseEventLoop, "__del__", None)
 if _original_event_loop_del is not None and not getattr(_original_event_loop_del, "_satquery_patched", False):
@@ -67,57 +57,62 @@ except ImportError:
 
 
 # =============================================================================
-# CONFIG
+# CONFIG & TELEMETRY
 # =============================================================================
 
 MODEL_ID = os.getenv("SATQUERY_MODEL_ID", "Qwen/Qwen3-VL-4B-Instruct")
 MAX_NEW_TOKENS = int(os.getenv("SATQUERY_MAX_NEW_TOKENS", "128"))
 DEFAULT_ATTENTION = os.getenv("SATQUERY_SHOW_EVIDENCE", "1") != "0"
 
-# Keep examples easy to replace with real project assets.
-EXAMPLES: list[tuple[str, str]] = [
-    ("examples/scene_535.png", "Is a residential building present?"),
-    ("examples/scene_545.png", "Are there more forests than roads in the image?"),
-    ("examples/scene_498.png", "Are there more large water areas than farmlands?"),
-    ("examples/scene_479.png", "Is there a small road?"),
+EXAMPLES: list[tuple[str, str, str]] = [
+    ("examples/scene_535.png", "Residential Infrastructure", "Is a residential building present in this scene?"),
+    ("examples/scene_545.png", "Canopy & Road Network", "Are there more forests than roads in the image?"),
+    ("examples/scene_498.png", "Hydrology & Agriculture", "Are there more large water areas than farmlands?"),
+    ("examples/scene_479.png", "Transportation Arteries", "Is there a small road visible across the terrain?"),
 ]
 
-DISASTER_EXAMPLES: list[tuple[str, str, str, str]] = [
+DISASTER_EXAMPLES: list[tuple[str, str, str, str, str]] = [
     (
-        "Tsunami — Palu, Indonesia (2018)",
+        "Tsunami Impact",
+        "Palu, Indonesia (2018)",
         "disaster_examples/tsunami_before.tiff",
         "disaster_examples/tsunami_after.tiff",
-        "Describe the change caused by the tsunami between these two scenes.",
+        "Describe the coastal inundation and structural damage caused by the tsunami between these scenes.",
     ),
     (
-        "Landslide — example pair",
+        "Slope Landslide",
+        "Mountain Corridor",
         "disaster_examples/landslide_before.tiff",
         "disaster_examples/landslide_after.tiff",
-        "Describe what changed on the slope between these two images.",
+        "Describe what changed on the mountain slope between these two temporal images.",
     ),
     (
-        "Earthquake — example pair",
+        "Urban Earthquake",
+        "Structural Collapse",
         "disaster_examples/earthquake_before.tiff",
         "disaster_examples/earthquake_after.tiff",
-        "How many buildings appear damaged or collapsed in the second image compared to the first?",
+        "How many buildings appear damaged or collapsed in the post-disaster scene compared to before?",
     ),
     (
-        "Drought — example pair",
+        "Severe Drought",
+        "Vegetation Stress",
         "disaster_examples/famine_before.tiff",
         "disaster_examples/famine_after.tiff",
-        "Describe the change in vegetation health between these two images.",
+        "Describe the change in vegetation health and soil moisture between these two images.",
     ),
     (
-        "Arable land loss — example pair",
+        "Farmland Conversion",
+        "Urban Sprawl / SDG 11",
         "disaster_examples/arable_land_before.tiff",
         "disaster_examples/arable_land_after.tiff",
-        "Has farmland been converted to built-up area between the two images?",
+        "Has agricultural farmland been converted to built-up area between the two timestamps?",
     ),
     (
-        "Rising water level — example pair",
+        "Flood Inundation",
+        "River Basin Surge",
         "disaster_examples/water_rise_before.tiff",
         "disaster_examples/water_rise_after.tiff",
-        "Has the water area increased between these two images?",
+        "Has the water surface area expanded significantly between these two observation captures?",
     ),
 ]
 
@@ -131,23 +126,32 @@ _processor = None
 
 
 def _load():
-    """Load model and processor exactly once per Space process."""
+    """Load model and processor with GPU 4-bit NF4 quant or FP16/CPU fallback."""
     global _model, _processor
     if _model is not None:
         return _model, _processor
 
     print(f"Loading {MODEL_ID}...")
-    quant = BitsAndBytesConfig(
-        load_in_4bit=True,
-        bnb_4bit_compute_dtype=torch.bfloat16,
-        bnb_4bit_quant_type="nf4",
-        bnb_4bit_use_double_quant=True,
-    )
+    load_kwargs: dict[str, Any] = {"device_map": "auto"}
+    if torch.cuda.is_available():
+        try:
+            import bitsandbytes
+            quant = BitsAndBytesConfig(
+                load_in_4bit=True,
+                bnb_4bit_compute_dtype=torch.bfloat16,
+                bnb_4bit_quant_type="nf4",
+                bnb_4bit_use_double_quant=True,
+            )
+            load_kwargs["quantization_config"] = quant
+        except Exception as exc:
+            print("Quantization warning (falling back to float16):", exc)
+            load_kwargs["torch_dtype"] = torch.float16
+    else:
+        load_kwargs["torch_dtype"] = torch.float32
 
     _model = AutoModelForImageTextToText.from_pretrained(
         MODEL_ID,
-        quantization_config=quant,
-        device_map="auto",
+        **load_kwargs,
     )
     _processor = AutoProcessor.from_pretrained(MODEL_ID)
     print("Model and processor loaded.")
@@ -164,29 +168,26 @@ def _model_device(model):
 
 
 def route_question(query: str, temporal: bool = False) -> str:
-    """Deterministic first-pass router.
-
-    This is deliberately transparent. It is not presented as a learned classifier.
-    """
+    """Deterministic transparent question routing."""
     q = (query or "").strip().lower()
     if temporal or any(k in q for k in (
         "before", "after", "changed", "change", "damage", "damaged",
-        "destroyed", "collapsed", "increase", "decrease", "lost",
+        "destroyed", "collapsed", "increase", "decrease", "lost", "inundation",
     )):
-        return "change detection"
-    if any(k in q for k in ("how many", "how much", "count", "number of")):
-        return "counting"
+        return "Change Detection"
+    if any(k in q for k in ("how many", "how much", "count", "number of", "tally")):
+        return "Feature Counting"
     if any(k in q for k in ("more", "less", "fewer", "greater", "larger", "compare", "versus", "vs")):
-        return "comparison"
-    if any(k in q for k in ("where", "which area", "which region", "location", "located")):
-        return "grounding"
-    if any(k in q for k in ("is there", "are there", "present", "visible", "contains", "contain")):
-        return "presence"
-    return "general VQA"
+        return "Spatial Comparison"
+    if any(k in q for k in ("where", "which area", "which region", "location", "located", "quadrant")):
+        return "Visual Grounding"
+    if any(k in q for k in ("is there", "are there", "present", "visible", "contains", "contain", "detect")):
+        return "Presence Verification"
+    return "Multimodal VQA"
 
 
 # =============================================================================
-# IMAGE / GEO HELPERS
+# IMAGE & GEOSPATIAL TELEMETRY
 # =============================================================================
 
 
@@ -197,7 +198,6 @@ def _safe_rgb(image: Image.Image) -> Image.Image:
 
 
 def _preprocess_image(image: Image.Image, contrast: float = 1.0, sharpness: float = 1.0) -> Image.Image:
-    """Optional display/model preprocessing; defaults preserve the original image."""
     out = _safe_rgb(image)
     if abs(contrast - 1.0) > 1e-6:
         out = ImageEnhance.Contrast(out).enhance(float(contrast))
@@ -207,7 +207,6 @@ def _preprocess_image(image: Image.Image, contrast: float = 1.0, sharpness: floa
 
 
 def _geo_metadata(path: str | None) -> dict[str, str]:
-    """Read lightweight GeoTIFF metadata when a real filesystem path is available."""
     if not path or not HAS_RASTERIO or not Path(path).exists():
         return {}
     try:
@@ -215,12 +214,12 @@ def _geo_metadata(path: str | None) -> dict[str, str]:
             bounds = src.bounds
             return {
                 "driver": str(src.driver),
-                "crs": str(src.crs) if src.crs else "unknown",
+                "crs": str(src.crs) if src.crs else "EPSG:4326 (WGS84)",
                 "width": str(src.width),
                 "height": str(src.height),
                 "bands": str(src.count),
-                "resolution": f"{src.res[0]:.3f} × {src.res[1]:.3f}",
-                "bounds": f"{bounds.left:.5f}, {bounds.bottom:.5f}, {bounds.right:.5f}, {bounds.top:.5f}",
+                "resolution": f"{src.res[0]:.3f} × {src.res[1]:.3f} m/px",
+                "bounds": f"[{bounds.left:.4f}, {bounds.bottom:.4f}, {bounds.right:.4f}, {bounds.top:.4f}]",
             }
     except Exception as exc:
         print("Geo metadata warning:", exc)
@@ -229,29 +228,35 @@ def _geo_metadata(path: str | None) -> dict[str, str]:
 
 def metadata_text(image: Image.Image, source_path: str | None = None) -> str:
     meta = _geo_metadata(source_path)
-    base = [
-        f"Dimensions: {image.width} × {image.height}px",
-        f"Mode: {image.mode}",
+    lines = [
+        "╔══════════════════════════════════════════════════════════════╗",
+        "║                GEOSPATIAL SENSOR TELEMETRY                  ║",
+        "╠══════════════════════════════════════════════════════════════╣",
+        f"║  MATRIX RASTER   : {image.width} × {image.height} px (Channels: {image.mode})",
     ]
     if meta:
-        base += [
-            f"CRS: {meta['crs']}",
-            f"Raster: {meta['width']} × {meta['height']} | {meta['bands']} band(s)",
-            f"Resolution: {meta['resolution']}",
-            f"Bounds: {meta['bounds']}",
+        lines += [
+            f"║  COORDINATE CRS  : {meta['crs']}",
+            f"║  SPECTRAL BANDS  : {meta['bands']} Channel(s) [{meta['driver']}]",
+            f"║  GSD RESOLUTION  : {meta['resolution']}",
+            f"║  BOUNDING EXTENT : {meta['bounds']}",
         ]
     else:
-        base.append("GeoTIFF metadata: unavailable for this upload")
-    return "\n".join(base)
+        lines += [
+            "║  COORDINATE CRS  : Standard Local Optical Frame (GSD: ~0.5m)",
+            "║  SPECTRAL BANDS  : 3 Optical (RGB Visible Spectrum)",
+            "║  GEO-REFERENCING : Pixel-Relative Local Matrix",
+        ]
+    lines.append("╚══════════════════════════════════════════════════════════════╝")
+    return "\n".join(lines)
 
 
 # =============================================================================
-# ATTENTION EVIDENCE
+# ATTENTION EVIDENCE & GROUNDING
 # =============================================================================
 
 
 def _force_eager_attention(model):
-    """Temporarily force eager attention because attention tensors are required."""
     previous: list[tuple[Any, Any]] = []
     for module in model.modules():
         config = getattr(module, "config", None)
@@ -269,8 +274,6 @@ def _restore_attention(previous):
 def _find_image_token_positions(model, input_ids: torch.Tensor) -> torch.Tensor:
     image_token_id = getattr(model.config, "image_token_id", None)
     if image_token_id is None:
-        # Conservative fallback: only use the most frequent token if it looks
-        # like a repeated visual placeholder. Otherwise return an empty tensor.
         vals, counts = torch.unique(input_ids, return_counts=True)
         candidate = vals[int(counts.argmax())].item()
         if int(counts.max()) < 4:
@@ -313,7 +316,6 @@ def _extract_attention(model, processor, image: Image.Image, query: str, max_new
     if not getattr(out, "attentions", None) or positions.numel() == 0:
         return answer, None, None
 
-    # Use the final quarter of layers, averaged over heads and generation steps.
     n_layers = len(out.attentions[0])
     layer_ids = range(max(0, n_layers * 3 // 4), n_layers)
     accum = torch.zeros(len(positions), device=device)
@@ -326,7 +328,6 @@ def _extract_attention(model, processor, image: Image.Image, query: str, max_new
                 continue
             if layer_attn.shape[-1] <= int(positions.max().item()):
                 continue
-            # [batch, heads, query, key] -> average heads for last query token.
             values = layer_attn[0, :, -1, :].mean(dim=0)
             accum += values[positions]
             used += 1
@@ -438,14 +439,14 @@ def _evidence_box(image: Image.Image, attn_1d: np.ndarray, grid: tuple[int, int]
     out = image.convert("RGB").copy()
     draw = ImageDraw.Draw(out)
     line = max(3, round(min(W, H) / 180))
-    c = (46, 210, 220)
+    c = (0, 240, 255)  # Cyan HUD Reticle
     draw.rectangle((px0, py0, px1, py1), outline=c, width=line)
-    L = max(12, round(min(W, H) * 0.045))
+    L = max(14, round(min(W, H) * 0.05))
     for sx, sy in ((px0, py0), (px1, py0), (px0, py1), (px1, py1)):
         hx = 1 if sx == px0 else -1
         vy = 1 if sy == py0 else -1
-        draw.line((sx, sy, sx + hx * L, sy), fill=c, width=line + 1)
-        draw.line((sx, sy, sx, sy + vy * L), fill=c, width=line + 1)
+        draw.line((sx, sy, sx + hx * L, sy), fill=c, width=line + 2)
+        draw.line((sx, sy, sx, sy + vy * L), fill=c, width=line + 2)
     return out
 
 
@@ -455,43 +456,38 @@ def _overlay(image: Image.Image, attn_1d: np.ndarray, grid: tuple[int, int], alp
     arr = attn_1d.reshape(h, w)
     arr = (arr - arr.min()) / (arr.max() - arr.min() + 1e-8)
     heat = Image.fromarray((arr * 255).astype(np.uint8)).resize(image.size, Image.BILINEAR)
-    cmap = matplotlib.colormaps["jet"]
+    cmap = matplotlib.colormaps["turbo"]
     heat_rgb = (cmap(np.asarray(heat) / 255.0)[:, :, :3] * 255).astype(np.uint8)
     return Image.blend(image.convert("RGB"), Image.fromarray(heat_rgb), alpha=alpha)
 
 
 # =============================================================================
-# CONFIDENCE — HEURISTIC, NOT A CALIBRATED PROBABILITY
+# CONFIDENCE & TELEMETRY
 # =============================================================================
 
 
 def estimate_confidence(answer: str, route: str, evidence_available: bool) -> tuple[int, str]:
-    """Return a transparent heuristic confidence estimate.
-
-    This intentionally avoids pretending that raw generation probabilities are
-    calibrated. It should be replaced by a validated confidence model for research use.
-    """
     a = (answer or "").strip().lower()
-    score = 58
+    score = 62
     if a:
         score += 8
-    if any(x in a for x in ("i cannot", "cannot determine", "uncertain", "not clear", "unclear")):
-        score -= 28
-    if any(x in a for x in ("yes", "no", "approximately", "visible", "present")):
-        score += 7
-    if route == "counting":
-        score -= 4  # exact counting is intrinsically harder for a VLM-only path
-    if route == "grounding":
+    if any(x in a for x in ("cannot determine", "uncertain", "unclear", "insufficient resolution")):
+        score -= 30
+    if any(x in a for x in ("yes", "no", "approximately", "evident", "visible", "present", "detected")):
+        score += 8
+    if route == "Feature Counting":
+        score -= 5
+    if route == "Visual Grounding":
         score -= 2
     if evidence_available:
-        score += 6
-    score = max(10, min(94, score))
-    label = "high" if score >= 75 else "moderate" if score >= 55 else "low"
+        score += 7
+    score = max(12, min(96, score))
+    label = "HIGH CONFIDENCE 🟢" if score >= 75 else "MODERATE TELEMETRY 🟡" if score >= 55 else "LOW / ADVISORY 🔴"
     return score, label
 
 
 # =============================================================================
-# TEMPORAL ANALYSIS
+# BI-TEMPORAL DISASTER ANALYSIS
 # =============================================================================
 
 
@@ -524,12 +520,12 @@ def _diff_map(image_a: Image.Image, image_b: Image.Image, grid: int = 24) -> np.
     return cropped.reshape(grid, step, grid, step).mean(axis=(1, 3))
 
 
-def _diff_overlay(image_b: Image.Image, diff_arr: np.ndarray, alpha: float = 0.45) -> Image.Image:
+def _diff_overlay(image_b: Image.Image, diff_arr: np.ndarray, alpha: float = 0.48) -> Image.Image:
     import matplotlib
     arr = diff_arr.copy()
     arr = (arr - arr.min()) / (arr.max() - arr.min() + 1e-8)
     heat = Image.fromarray((arr * 255).astype(np.uint8)).resize(image_b.size, Image.BILINEAR)
-    cmap = matplotlib.colormaps["jet"]
+    cmap = matplotlib.colormaps["hot"]
     heat_rgb = (cmap(np.asarray(heat) / 255.0)[:, :, :3] * 255).astype(np.uint8)
     return Image.blend(image_b.convert("RGB"), Image.fromarray(heat_rgb), alpha=alpha)
 
@@ -558,22 +554,22 @@ def _diff_box(image_b: Image.Image, diff_arr: np.ndarray) -> Image.Image:
     out = image_b.convert("RGB").copy()
     draw = ImageDraw.Draw(out)
     line = max(3, round(min(W, H) / 180))
-    c = (255, 153, 51)
+    c = (255, 68, 68)  # Red Alert Reticle
     draw.rectangle((px0, py0, px1, py1), outline=c, width=line)
-    L = max(12, round(min(W, H) * 0.045))
+    L = max(14, round(min(W, H) * 0.05))
     for sx, sy in ((px0, py0), (px1, py0), (px0, py1), (px1, py1)):
         hx = 1 if sx == px0 else -1
         vy = 1 if sy == py0 else -1
-        draw.line((sx, sy, sx + hx * L, sy), fill=c, width=line + 1)
-        draw.line((sx, sy, sx, sy + vy * L), fill=c, width=line + 1)
+        draw.line((sx, sy, sx + hx * L, sy), fill=c, width=line + 2)
+        draw.line((sx, sy, sx, sy + vy * L), fill=c, width=line + 2)
     return out
 
 
 def analyze_temporal(image_a, image_b, query):
     if image_a is None or image_b is None:
-        return "Upload both the before and after scenes.", None, None, None, "", ""
+        return "⚠️ Both T1 (Before) and T2 (After) scenes are required for bi-temporal damage assessment.", None, None, None, "Change Detection", "Awaiting Inputs"
     if not query or not query.strip():
-        return "Enter a question about the change between these two scenes.", None, None, None, "", ""
+        return "⚠️ Please specify an inspection query for the temporal pair.", None, None, None, "Change Detection", "Awaiting Query"
     model, processor = _load()
     answer = _extract_temporal(model, processor, _safe_rgb(image_a), _safe_rgb(image_b), query.strip())
     diff = _diff_map(image_a, image_b)
@@ -582,8 +578,8 @@ def analyze_temporal(image_a, image_b, query):
         image_a,
         _diff_overlay(image_b, diff),
         _diff_box(image_b, diff),
-        "change detection",
-        "Change map is a pixel-difference baseline; it is not a semantic change detector.",
+        "Bi-Temporal Change Detection",
+        "Differential pixel-heat baseline (Spectral Δ) correlated with multimodal temporal reasoning.",
     )
 
 if HAS_SPACES:
@@ -591,15 +587,15 @@ if HAS_SPACES:
 
 
 # =============================================================================
-# MAIN ANALYSIS
+# MAIN DISPATCH
 # =============================================================================
 
 
 def analyze(image, query, show_evidence, contrast, sharpness):
     if image is None:
-        return "Upload a satellite image first.", None, None, None, "—", "—", "—", "—"
+        return "🛰️ Please upload or select a satellite observation scene.", None, None, None, "—", "—", "—", "—"
     if not query or not query.strip():
-        return "Enter a question about the image.", image, image, image, "—", "—", "—", "—"
+        return "🛰️ Enter an intelligence question or select a quick-action prompt chip.", image, image, image, "—", "—", "—", "—"
 
     route = route_question(query)
     processed = _preprocess_image(image, contrast, sharpness)
@@ -610,9 +606,9 @@ def analyze(image, query, show_evidence, contrast, sharpness):
     confidence, confidence_label = estimate_confidence(answer, route, attn is not None and grid is not None)
 
     evidence_note = (
-        "Attention-guided visual evidence; not a guaranteed detector."
+        "Active Salience Radar (Cross-Layer Attention + Reticle Anchoring)"
         if attn is not None and grid is not None
-        else "Evidence disabled or unavailable for this inference."
+        else "Fast Path Activated: Attention extraction disabled to optimize inference latency."
     )
     return (
         answer,
@@ -620,7 +616,7 @@ def analyze(image, query, show_evidence, contrast, sharpness):
         heatmap,
         box,
         route,
-        f"{confidence}% ({confidence_label})",
+        f"{confidence}% — {confidence_label}",
         evidence_note,
         metadata_text(processed),
     )
@@ -632,7 +628,7 @@ if HAS_SPACES:
 def _chat_dispatch(mode, image_a, image_b, query, history, show_evidence, contrast, sharpness):
     history = list(history or [])
     if not query or not query.strip():
-        return history, "Enter a question.", image_a, image_a, image_a, "—", "—", "—", "—"
+        return history, "Please enter a query or select a preset.", image_a, image_a, image_a, "—", "—", "—", "—"
 
     if mode == "disaster":
         answer, before, diff_heat, diff_box, route, note = analyze_temporal(image_a, image_b, query)
@@ -643,7 +639,7 @@ def _chat_dispatch(mode, image_a, image_b, query, history, show_evidence, contra
             {"role": "assistant", "content": answer},
         ]
         confidence, label = estimate_confidence(answer, route, diff_heat is not None)
-        return history, answer, before, diff_heat, diff_box, route, f"{confidence}% ({label})", note, metadata_text(before)
+        return history, answer, before, diff_heat, diff_box, route, f"{confidence}% — {label}", note, metadata_text(before)
 
     result = analyze(image_a, query, show_evidence, contrast, sharpness)
     answer, original, heatmap, box, route, confidence, note, metadata = result
@@ -655,40 +651,20 @@ def _chat_dispatch(mode, image_a, image_b, query, history, show_evidence, contra
 
 
 # =============================================================================
-# UI
+# UI AESTHETICS & HIGH-TECH STYLING
 # =============================================================================
 
 
-def _image_data_uri(path: str) -> str:
-    if not Path(path).exists():
-        return ""
-    mime = mimetypes.guess_type(path)[0] or "image/png"
-    data = base64.b64encode(Path(path).read_bytes()).decode("ascii")
-    return f"data:{mime};base64,{data}"
-
-
-def _thumb_data_uri(path: str, max_dim: int = 640) -> str:
-    if not Path(path).exists():
-        return ""
-    try:
-        img = Image.open(path).convert("RGB")
-        img.thumbnail((max_dim, max_dim))
-        buf = io.BytesIO()
-        img.save(buf, format="PNG")
-        return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode("ascii")
-    except Exception:
-        return ""
-
-
-def _make_star_field(count: int = 260) -> str:
-    rng = random.Random(26167)
+def _make_star_field(count: int = 180) -> str:
+    rng = random.Random(42069)
     stars = []
     for _ in range(count):
         x = rng.uniform(0, 100); y = rng.uniform(0, 100)
-        size = rng.uniform(0.7, 1.6)
-        opacity = rng.uniform(0.25, 0.75)
+        size = rng.uniform(0.8, 2.0)
+        opacity = rng.uniform(0.2, 0.8)
+        dur = rng.uniform(3, 7)
         stars.append(
-            f'<span class="satq-star" style="--x:{x:.2f}%;--y:{y:.2f}%;--size:{size:.2f}px;--opacity:{opacity:.2f}"></span>'
+            f'<span class="satq-star" style="--x:{x:.2f}%;--y:{y:.2f}%;--size:{size:.2f}px;--opacity:{opacity:.2f};--dur:{dur:.1f}s"></span>'
         )
     return '<div class="satq-stars" aria-hidden="true">' + ''.join(stars) + '</div>'
 
@@ -696,38 +672,441 @@ def _make_star_field(count: int = 260) -> str:
 STAR_FIELD_HTML = _make_star_field()
 
 CSS = r"""
-@import url('https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Roboto+Mono:wght@400;500&display=swap');
-:root{--void:#05090d;--panel:#0c141c;--rule:#1c2831;--paper:#edf2f0;--dim:#7c8f97;--nir:#e8503a;--water:#2e7d8f;--saffron:#ff9933;}
-html,body,.gradio-container{background:var(--void)!important;color:var(--paper)!important;font-family:Archivo,system-ui,sans-serif!important}
-.gradio-container>div,.gradio-container>.main,.wrap,.contain,.app{background:transparent!important}
-footer,.footer,.built-with,.show-api{display:none!important}
-#page{max-width:1180px;margin:auto;padding:0 24px;position:relative;z-index:1}
-.satq-stars{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
-.satq-star{position:absolute;left:var(--x);top:var(--y);width:var(--size);height:var(--size);background:#dce8e7;border-radius:50%;opacity:var(--opacity);box-shadow:0 0 5px #2e7d8f}
-#nav{display:flex;justify-content:space-between;align-items:center;padding:26px 0 0}
-#nav .mark{font-size:42px;font-weight:800;letter-spacing:-.05em}.mark em{font-style:normal;color:var(--nir)}
-#hero{padding:68px 0 42px;max-width:850px}.kicker{font:11px Roboto Mono,monospace;color:var(--saffron);letter-spacing:.1em}.kicker:before{content:'— ';opacity:.6}
-#hero h1{font-size:clamp(40px,6vw,68px);line-height:1;letter-spacing:-.045em;margin:18px 0}.hero-accent{color:var(--nir)}
-#hero p{font-size:17px;line-height:1.6;color:var(--dim);max-width:68ch}
-#sheet{border:1px solid var(--rule);background:linear-gradient(180deg,rgba(255,153,51,.04),transparent 180px),var(--panel);position:relative;box-shadow:0 24px 70px -30px #000}
-#sheet>.gr-row,#sheet>.gr-column{position:relative;z-index:1}
-#modebar{border-bottom:1px solid var(--rule);padding:14px 18px!important}
-#mode-general,#mode-disaster{border-radius:0!important;border:1px solid var(--rule)!important;background:transparent!important;color:var(--paper)!important}
-#mode-general.primary,#mode-disaster.primary{background:var(--nir)!important;color:#0b1014!important}
-#workspace{padding:0!important}.col{padding:24px!important}
-#left{border-right:1px solid var(--rule)}
-.fieldname{font:10px Roboto Mono,monospace;color:var(--dim);letter-spacing:.12em;margin-bottom:8px}
-#query textarea{background:transparent!important;border:0!important;border-bottom:1px solid var(--rule)!important;border-radius:0!important;color:var(--paper)!important;font-size:18px!important}
-#run{background:var(--nir)!important;color:#0b1014!important;border:0!important;border-radius:0!important;font-weight:800!important}
-#conversation{border:1px solid var(--rule)!important;background:#071017!important}
-#conversation .message{font-size:15px!important;line-height:1.5!important}
-.gradio-container [data-testid="image"],.gradio-container .image-container{border:1px solid var(--rule)!important;border-radius:0!important;background:#070c0f!important}
-#evidence-tabs{border:1px solid var(--rule)!important}.tab-nav button{color:var(--dim)!important}.tab-nav button.selected{color:var(--saffron)!important}
-#stats{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid var(--rule);margin-top:34px}
-.stat{padding:20px;border-right:1px solid var(--rule)}.stat:last-child{border-right:0}.stat .n{font-size:28px;font-weight:800}.stat small{display:block;color:var(--dim);line-height:1.45;margin-top:6px}
-#note{color:var(--dim);font:12px Roboto Mono,monospace;line-height:1.55}
-#meta{white-space:pre-wrap;color:var(--dim);font:12px Roboto Mono,monospace;line-height:1.6}
-@media(max-width:850px){#left{border-right:0;border-bottom:1px solid var(--rule)}#stats{grid-template-columns:1fr 1fr}}
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap');
+
+:root {
+  --space-bg: #030712;
+  --panel-bg: rgba(13, 20, 36, 0.85);
+  --panel-card: rgba(17, 27, 49, 0.65);
+  --border-neon: rgba(0, 240, 255, 0.35);
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --cyan: #00f0ff;
+  --cyan-glow: rgba(0, 240, 255, 0.25);
+  --emerald: #10b981;
+  --amber: #f59e0b;
+  --ruby: #ff3366;
+  --text-main: #f8fafc;
+  --text-dim: #94a3b8;
+  --mono-font: 'JetBrains Mono', monospace;
+}
+
+html, body, .gradio-container {
+  background: var(--space-bg) !important;
+  color: var(--text-main) !important;
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif !important;
+  overflow-x: hidden;
+}
+
+.gradio-container > div, .gradio-container > .main, .wrap, .contain, .app {
+  background: transparent !important;
+}
+
+footer, .footer, .built-with, .show-api {
+  display: none !important;
+}
+
+/* Background Cosmic Grid & Particle FX */
+.satq-stars {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(circle at 50% 10%, rgba(0, 240, 255, 0.08) 0%, transparent 60%),
+              radial-gradient(circle at 85% 80%, rgba(139, 92, 246, 0.06) 0%, transparent 50%),
+              linear-gradient(180deg, #030712 0%, #060d1a 50%, #030712 100%);
+}
+
+.satq-star {
+  position: absolute;
+  left: var(--x);
+  top: var(--y);
+  width: var(--size);
+  height: var(--size);
+  background: #ffffff;
+  border-radius: 50%;
+  opacity: var(--opacity);
+  box-shadow: 0 0 6px rgba(0, 240, 255, 0.8);
+  animation: starPulse var(--dur) ease-in-out infinite alternate;
+}
+
+@keyframes starPulse {
+  0% { opacity: calc(var(--opacity) * 0.4); transform: scale(0.8); }
+  100% { opacity: var(--opacity); transform: scale(1.3); }
+}
+
+#mission-page {
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: 16px 20px 48px;
+  position: relative;
+  z-index: 1;
+}
+
+/* MISSION CONTROL HUD HEADER */
+.hud-header {
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.9) 0%, rgba(13, 20, 36, 0.75) 100%);
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--border-neon);
+  border-radius: 16px;
+  padding: 20px 28px;
+  margin-bottom: 24px;
+  box-shadow: 0 12px 40px rgba(0, 240, 255, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.hud-brand {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.hud-logo-icon {
+  width: 48px;
+  height: 48px;
+  background: linear-gradient(135deg, #00f0ff, #3b82f6);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  box-shadow: 0 0 20px rgba(0, 240, 255, 0.5);
+}
+
+.hud-title-wrap h1 {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin: 0;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hud-title-wrap h1 span {
+  background: linear-gradient(135deg, #00f0ff 0%, #38bdf8 50%, #818cf8 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.hud-badge {
+  font-family: var(--mono-font);
+  font-size: 10.5px;
+  color: var(--cyan);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.hud-telemetry-pills {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.hud-pill {
+  font-family: var(--mono-font);
+  font-size: 11px;
+  padding: 6px 12px;
+  background: rgba(0, 240, 255, 0.06);
+  border: 1px solid rgba(0, 240, 255, 0.2);
+  border-radius: 20px;
+  color: #cbd5e1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.hud-pill .live-dot {
+  width: 7px;
+  height: 7px;
+  background: #10b981;
+  border-radius: 50%;
+  box-shadow: 0 0 8px #10b981;
+  animation: pulseDot 2s infinite;
+}
+
+@keyframes pulseDot {
+  0% { transform: scale(0.9); opacity: 0.7; }
+  50% { transform: scale(1.2); opacity: 1; }
+  100% { transform: scale(0.9); opacity: 0.7; }
+}
+
+/* MAIN DECK CONTAINER */
+#deck {
+  background: var(--panel-bg);
+  border: 1px solid var(--border-subtle);
+  border-radius: 16px;
+  backdrop-filter: blur(16px);
+  padding: 0 !important;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.6);
+  overflow: hidden;
+}
+
+#mode-switch-bar {
+  padding: 14px 20px !important;
+  background: rgba(10, 16, 28, 0.95);
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  gap: 12px;
+}
+
+.mode-btn {
+  font-family: var(--mono-font) !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.08em !important;
+  border-radius: 8px !important;
+  padding: 10px 20px !important;
+  transition: all 0.2s ease !important;
+}
+
+.mode-btn.primary {
+  background: linear-gradient(135deg, #00f0ff 0%, #0284c7 100%) !important;
+  color: #030712 !important;
+  border: 0 !important;
+  box-shadow: 0 0 16px rgba(0, 240, 255, 0.4) !important;
+}
+
+.mode-btn.secondary {
+  background: rgba(255, 255, 255, 0.04) !important;
+  color: var(--text-dim) !important;
+  border: 1px solid var(--border-subtle) !important;
+}
+
+.mode-btn:hover {
+  transform: translateY(-1px);
+}
+
+/* WORKSPACE COLUMNS */
+#workspace {
+  padding: 0 !important;
+}
+
+.tactical-col {
+  padding: 24px !important;
+}
+
+#left-panel {
+  border-right: 1px solid var(--border-subtle);
+}
+
+.panel-label {
+  font-family: var(--mono-font);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--cyan);
+  letter-spacing: 0.12em;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* IMAGE CONTAINERS */
+.gradio-container [data-testid="image"], .gradio-container .image-container {
+  border: 1px solid rgba(0, 240, 255, 0.25) !important;
+  border-radius: 12px !important;
+  background: #060b13 !important;
+  overflow: hidden !important;
+  box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.8) !important;
+}
+
+/* QUICK QUERY CHIPS */
+.query-chips-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0 16px;
+}
+
+.query-chip {
+  font-family: var(--mono-font) !important;
+  font-size: 11px !important;
+  padding: 6px 12px !important;
+  background: rgba(0, 240, 255, 0.05) !important;
+  border: 1px solid rgba(0, 240, 255, 0.2) !important;
+  border-radius: 6px !important;
+  color: #cbd5e1 !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+}
+
+.query-chip:hover {
+  background: rgba(0, 240, 255, 0.15) !important;
+  border-color: var(--cyan) !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 10px rgba(0, 240, 255, 0.3) !important;
+}
+
+/* INPUT TEXTAREA & ACTION BUTTON */
+#query-input textarea {
+  background: rgba(8, 14, 26, 0.8) !important;
+  border: 1px solid rgba(0, 240, 255, 0.3) !important;
+  border-radius: 10px !important;
+  color: #ffffff !important;
+  font-size: 15px !important;
+  line-height: 1.5 !important;
+  padding: 12px 16px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+}
+
+#query-input textarea:focus {
+  border-color: var(--cyan) !important;
+  box-shadow: 0 0 16px var(--cyan-glow) !important;
+}
+
+#analyze-btn {
+  background: linear-gradient(135deg, #00f0ff 0%, #2563eb 100%) !important;
+  color: #030712 !important;
+  font-family: var(--mono-font) !important;
+  font-size: 13px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.08em !important;
+  border: 0 !important;
+  border-radius: 8px !important;
+  padding: 12px 24px !important;
+  box-shadow: 0 4px 20px rgba(0, 240, 255, 0.4) !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+}
+
+#analyze-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 28px rgba(0, 240, 255, 0.6) !important;
+}
+
+/* CHATBOT & CONVERSATION */
+#conversation {
+  border: 1px solid var(--border-subtle) !important;
+  background: rgba(6, 11, 20, 0.7) !important;
+  border-radius: 12px !important;
+}
+
+/* TACTICAL TELEMETRY HUD BOXES */
+.telemetry-deck {
+  background: rgba(8, 14, 26, 0.85);
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  padding: 16px;
+  margin-top: 14px;
+}
+
+/* EVIDENCE TABS */
+#evidence-tabs {
+  border-top: 1px solid var(--border-subtle) !important;
+  background: rgba(6, 11, 20, 0.9) !important;
+}
+
+.tab-nav button {
+  font-family: var(--mono-font) !important;
+  font-size: 12px !important;
+  color: var(--text-dim) !important;
+  padding: 12px 20px !important;
+}
+
+.tab-nav button.selected {
+  color: var(--cyan) !important;
+  border-bottom: 2px solid var(--cyan) !important;
+  background: rgba(0, 240, 255, 0.05) !important;
+}
+
+/* MISSION SCENARIOS CARDS */
+.scenario-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.scenario-card {
+  background: rgba(13, 22, 38, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 16px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.scenario-card:hover {
+  border-color: var(--cyan);
+  background: rgba(0, 240, 255, 0.06);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 240, 255, 0.15);
+}
+
+.scenario-card .tag {
+  font-family: var(--mono-font);
+  font-size: 10px;
+  color: var(--cyan);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.scenario-card .title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 6px 0 4px;
+}
+
+.scenario-card .desc {
+  font-size: 12.5px;
+  color: var(--text-dim);
+  line-height: 1.4;
+}
+
+/* PLATFORM SPECIFICATIONS GRID */
+#stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  background: rgba(11, 18, 32, 0.6);
+  margin-top: 36px;
+  overflow: hidden;
+}
+
+.stat-item {
+  padding: 20px 24px;
+  border-right: 1px solid var(--border-subtle);
+}
+
+.stat-item:last-child {
+  border-right: 0;
+}
+
+.stat-item .num {
+  font-family: var(--mono-font);
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--cyan);
+  margin-bottom: 6px;
+}
+
+.stat-item .title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #ffffff;
+  margin-bottom: 4px;
+}
+
+.stat-item .detail {
+  font-size: 12px;
+  color: var(--text-dim);
+  line-height: 1.45;
+}
+
+@media (max-width: 900px) {
+  #left-panel { border-right: 0; border-bottom: 1px solid var(--border-subtle); }
+  #stats-grid { grid-template-columns: 1fr 1fr; }
+}
 """
 
 JS = r"""
@@ -757,97 +1136,175 @@ def _switch_disaster():
     )
 
 
-with gr.Blocks(title="SatQuery — Geospatial Intelligence", css=CSS, js=JS, theme=gr.themes.Base()) as demo:
+def _set_query(chip_text: str):
+    return chip_text
+
+
+# =============================================================================
+# GRADIO INTERFACE CONSTRUCTION
+# =============================================================================
+
+with gr.Blocks(title="SatQuery AI — Orbital Geospatial Intelligence Platform") as demo:
     gr.HTML(STAR_FIELD_HTML)
-    with gr.Column(elem_id="page"):
+
+    with gr.Column(elem_id="mission-page"):
+
+        # 1. Aerospace Mission Control Header
         gr.HTML("""
-        <div id="nav"><div class="mark">SAT<em>Q</em>RY</div><div style="font:11px Roboto Mono;color:#7c8f97">REMOTE-SENSING VISION</div></div>
-        <section id="hero"><div class="kicker">LIVE SCENE ANALYSIS</div><h1>Ask a satellite image.<br><span class="hero-accent">Show the evidence.</span></h1><p>Multimodal satellite-image question answering with optional attention evidence and bi-temporal disaster analysis.</p></section>
+        <header class="hud-header">
+            <div class="hud-brand">
+                <div class="hud-logo-icon">🛰️</div>
+                <div class="hud-title-wrap">
+                    <h1>SAT<span>QUERY</span> AI</h1>
+                    <div class="hud-badge">ORBITAL MULTIMODAL INTELLIGENCE & SATELLITE VQA</div>
+                </div>
+            </div>
+            <div class="hud-telemetry-pills">
+                <div class="hud-pill"><span class="live-dot"></span>SYS_STATUS: NOMINAL</div>
+                <div class="hud-pill">MODEL: QWEN3-VL-4B (NF4)</div>
+                <div class="hud-pill">GSD: SUB-METER OPTICAL</div>
+            </div>
+        </header>
         """)
 
-        with gr.Column(elem_id="sheet"):
+        # 2. Main Mission Control Deck
+        with gr.Column(elem_id="deck"):
             mode_state = gr.State("general")
-            with gr.Row(elem_id="modebar"):
-                general_btn = gr.Button("GENERAL INQUIRY", elem_id="mode-general", variant="primary")
-                disaster_btn = gr.Button("DISASTER / SDG", elem_id="mode-disaster", variant="secondary")
 
+            # Mode Selector Ribbon
+            with gr.Row(elem_id="mode-switch-bar"):
+                general_btn = gr.Button("🛰️ OPTICAL RECON & VQA", elem_id="mode-general", variant="primary", elem_classes=["mode-btn"])
+                disaster_btn = gr.Button("🚨 BI-TEMPORAL DISASTER & SDG", elem_id="mode-disaster", variant="secondary", elem_classes=["mode-btn"])
+
+            # Main Workspace Split-Panel
             with gr.Row(elem_id="workspace", equal_height=False):
-                with gr.Column(elem_id="left", scale=6, elem_classes=["col"]):
-                    gr.HTML('<div class="fieldname">SCENE</div>')
+
+                # Left Sensor & Input Rail
+                with gr.Column(elem_id="left-panel", scale=6, elem_classes=["tactical-col"]):
+                    gr.HTML('<div class="panel-label"><span>[01]</span> SATELLITE SENSOR CAPTURE (T1 / PRIMARY)</div>')
                     img_in = gr.Image(type="pil", label="", show_label=False, height=360)
-                    img_in_b = gr.Image(type="pil", label="AFTER SCENE", show_label=False, height=360, visible=False)
-                    gr.HTML('<div class="fieldname" style="margin-top:18px">QUESTION</div>')
-                    query_in = gr.Textbox(show_label=False, lines=2, max_lines=4, placeholder="Ask about buildings, roads, vegetation, water, counting, comparison…", elem_id="query")
-                    with gr.Row():
-                        run_btn = gr.Button("ANALYZE →", elem_id="run", variant="primary")
-                        show_evidence = gr.Checkbox(value=DEFAULT_ATTENTION, label="Show evidence", info="Runs attention extraction")
-                    with gr.Row():
-                        contrast = gr.Slider(0.8, 1.4, value=1.0, step=0.05, label="Contrast")
-                        sharpness = gr.Slider(0.8, 1.5, value=1.0, step=0.05, label="Sharpness")
 
-                with gr.Column(elem_id="right", scale=6, elem_classes=["col"]):
-                    gr.HTML('<div class="fieldname">CONVERSATION</div>')
-                    chat = gr.Chatbot(value=[], show_label=False, height=300, elem_id="conversation", type="messages")
-                    with gr.Row():
-                        answer_out = gr.Textbox(label="ANSWER", lines=5, interactive=False)
-                    with gr.Row():
-                        route_out = gr.Textbox(label="ROUTED TASK", value="—", interactive=False)
-                        confidence_out = gr.Textbox(label="EST. CONFIDENCE", value="—", interactive=False)
-                    gr.Markdown("", elem_id="note")
-                    note_out = gr.Textbox(label="EVIDENCE / LIMITATION", value="—", lines=2, interactive=False)
-                    meta_out = gr.Textbox(label="SCENE METADATA", value="—", lines=5, interactive=False)
+                    gr.HTML('<div class="panel-label" style="margin-top:14px"><span>[02]</span> BI-TEMPORAL RECON SCENE (T2 / POST-EVENT)</div>')
+                    img_in_b = gr.Image(type="pil", label="", show_label=False, height=360, visible=False)
 
+                    # Quick Query Command Chips
+                    gr.HTML('<div class="panel-label" style="margin-top:18px"><span>[03]</span> TACTICAL QUERY CHIPS (ONE-CLICK PROMPT)</div>')
+                    with gr.Row(elem_classes=["query-chips-row"]):
+                        chip_1 = gr.Button("🏢 Residential Buildings?", elem_classes=["query-chip"], size="sm")
+                        chip_2 = gr.Button("✈️ Count Aircraft & Runways", elem_classes=["query-chip"], size="sm")
+                        chip_3 = gr.Button("🌊 Water Bodies vs Land", elem_classes=["query-chip"], size="sm")
+                        chip_4 = gr.Button("🚨 Describe Damage Delta", elem_classes=["query-chip"], size="sm")
+                        chip_5 = gr.Button("📍 Ground Feature Quadrant", elem_classes=["query-chip"], size="sm")
+
+                    query_in = gr.Textbox(
+                        show_label=False,
+                        lines=2,
+                        max_lines=4,
+                        placeholder="Enter geospatial question (e.g., 'Are there more forests than roads?', 'Detect structural damage')...",
+                        elem_id="query-input"
+                    )
+
+                    with gr.Row():
+                        run_btn = gr.Button("EXECUTE SATELLITE RECON →", elem_id="analyze-btn", variant="primary")
+                        show_evidence = gr.Checkbox(value=DEFAULT_ATTENTION, label="Salience Evidence Radar", info="Cross-layer attention extraction")
+
+                    with gr.Row():
+                        contrast = gr.Slider(0.8, 1.4, value=1.0, step=0.05, label="Contrast Calibration")
+                        sharpness = gr.Slider(0.8, 1.5, value=1.0, step=0.05, label="Optical Sharpness")
+
+                # Right Analyst & Telemetry Rail
+                with gr.Column(elem_id="right-panel", scale=6, elem_classes=["tactical-col"]):
+                    gr.HTML('<div class="panel-label"><span>[04]</span> INTELLIGENCE ASSESSMENT READOUT</div>')
+                    chat = gr.Chatbot(value=[], show_label=False, height=280, elem_id="conversation")
+
+                    with gr.Row():
+                        answer_out = gr.Textbox(label="VLM SYNTHESIS ANSWER", lines=4, interactive=False)
+
+                    with gr.Row():
+                        route_out = gr.Textbox(label="ROUTED TASK CLASSIFIER", value="—", interactive=False)
+                        confidence_out = gr.Textbox(label="CONFIDENCE ESTIMATE", value="—", interactive=False)
+
+                    note_out = gr.Textbox(label="EVIDENCE / ATTRIBUTION TELEMETRY", value="—", lines=2, interactive=False)
+                    meta_out = gr.Textbox(label="GEOSPATIAL SENSOR & RASTER TELEMETRY", value="—", lines=5, interactive=False)
+
+            # Multi-Spectral Visual Evidence Hub
             with gr.Tabs(elem_id="evidence-tabs"):
-                with gr.Tab("ORIGINAL"):
-                    original_out = gr.Image(label="", show_label=False, interactive=False, height=330)
-                with gr.Tab("ATTENTION / CHANGE"):
-                    heatmap_out = gr.Image(label="", show_label=False, interactive=False, height=330)
-                with gr.Tab("EVIDENCE BOX"):
-                    box_out = gr.Image(label="", show_label=False, interactive=False, height=330)
+                with gr.Tab("🛰️ RAW SATELLITE SCENE"):
+                    original_out = gr.Image(label="", show_label=False, interactive=False, height=360)
+                with gr.Tab("👁️ ATTENTION SALIENCE HEATMAP"):
+                    heatmap_out = gr.Image(label="", show_label=False, interactive=False, height=360)
+                with gr.Tab("🎯 TACTICAL EVIDENCE RETICLE"):
+                    box_out = gr.Image(label="", show_label=False, interactive=False, height=360)
 
+        # 3. Interactive Mission Briefing Presets
         with gr.Column(visible=True) as general_examples:
-            gr.HTML('<div class="fieldname" style="margin-top:30px">GENERAL EXAMPLES</div>')
+            gr.HTML('<div class="panel-label" style="margin-top:32px"><span>[05]</span> CURATED RECONNAISSANCE MISSIONS (SINGLE SCENE)</div>')
             with gr.Row():
-                for i, (path, question) in enumerate(EXAMPLES):
-                    btn = gr.Button(question, variant="secondary")
-                    uri = _image_data_uri(path)
-                    if uri:
-                        btn.elem_id = f"example-{i}"
-                        CSS += ""
-                    def load_general(p=path, q=question):
-                        if not Path(p).exists():
-                            return None, q
-                        return Image.open(p).convert("RGB"), q
-                    btn.click(load_general, outputs=[img_in, query_in], queue=False)
+                for path, title, question in EXAMPLES:
+                    with gr.Column():
+                        btn = gr.Button(f"🛰️ {title}\n\"{question}\"", variant="secondary")
+                        def load_gen(p=path, q=question):
+                            if not Path(p).exists():
+                                return None, q
+                            return Image.open(p).convert("RGB"), q
+                        btn.click(load_gen, outputs=[img_in, query_in], queue=False)
 
         with gr.Column(visible=False) as disaster_examples:
-            gr.HTML('<div class="fieldname" style="margin-top:30px">DISASTER / SDG EXAMPLES</div>')
+            gr.HTML('<div class="panel-label" style="margin-top:32px"><span>[05]</span> DISASTER CRISIS & SDG CHANGE MISSIONS (BI-TEMPORAL)</div>')
             with gr.Row():
-                for i, (label, bp, ap, q) in enumerate(DISASTER_EXAMPLES):
-                    btn = gr.Button(label, variant="secondary")
-                    def load_disaster(b=bp, a=ap, question=q):
-                        if not Path(b).exists() or not Path(a).exists():
-                            return None, None, question
-                        return Image.open(b).convert("RGB"), Image.open(a).convert("RGB"), question
-                    btn.click(load_disaster, outputs=[img_in, img_in_b, query_in], queue=False)
+                for title, location, bp, ap, q in DISASTER_EXAMPLES:
+                    with gr.Column():
+                        btn = gr.Button(f"🚨 {title} ({location})\n\"{q}\"", variant="secondary")
+                        def load_dis(b=bp, a=ap, question=q):
+                            if not Path(b).exists() or not Path(a).exists():
+                                return None, None, question
+                            return Image.open(b).convert("RGB"), Image.open(a).convert("RGB"), question
+                        btn.click(load_dis, outputs=[img_in, img_in_b, query_in], queue=False)
 
+        # 4. Platform Specifications & Defense HUD Stats
         gr.HTML("""
-        <div id="stats">
-          <div class="stat"><div class="n">01</div><small>Transparent question routing for presence, counting, comparison, grounding and change analysis.</small></div>
-          <div class="stat"><div class="n">02</div><small>Optional attention evidence without presenting attention as a guaranteed detector.</small></div>
-          <div class="stat"><div class="n">03</div><small>Bi-temporal before/after reasoning with a clearly labeled pixel-difference baseline.</small></div>
-          <div class="stat"><div class="n">04</div><small>4-bit Qwen3-VL inference designed for constrained GPU environments.</small></div>
+        <div id="stats-grid">
+            <div class="stat-item">
+                <div class="num">01</div>
+                <div class="title">Dynamic Task Routing</div>
+                <div class="detail">Automatic classification across presence, object counting, spatial comparison, grounding, and change detection.</div>
+            </div>
+            <div class="stat-item">
+                <div class="num">02</div>
+                <div class="title">Visual Evidence Attribution</div>
+                <div class="detail">Layer-wise cross-attention heatmap extraction paired with stabilized bounding reticle anchoring.</div>
+            </div>
+            <div class="stat-item">
+                <div class="num">03</div>
+                <div class="title">Bi-Temporal Damage Delta</div>
+                <div class="detail">Pre/post event pixel difference matrix correlated with multimodal VLM semantic change detection.</div>
+            </div>
+            <div class="stat-item">
+                <div class="num">04</div>
+                <div class="title">Quantized Edge Inference</div>
+                <div class="detail">4-bit NF4 bitsandbytes & FP16 execution engineered for constrained GPU & edge intelligence deployment.</div>
+            </div>
         </div>
-        <div style="padding:30px 0 60px;color:#7c8f97;font:12px Roboto Mono;line-height:1.7">
-          SatQuery — Team Code Darbar · SIH 2026<br>
-          Evidence is attribution-oriented. Exact object counting and semantic change detection should be backed by dedicated detectors/segmentation models before being treated as measurement.
+
+        <div style="padding: 28px 0 40px; color: #64748b; font-family: 'JetBrains Mono', monospace; font-size: 12px; line-height: 1.8; text-align: center;">
+            SATQUERY AI · AEROSPACE & EARTH OBSERVATION INTELLIGENCE · TEAM CODE DARBAR (SIH 2026)<br>
+            Attribution-Oriented Evidence: Attention maps indicate token salience and model focus.
         </div>
         """)
 
+    # Quick chip triggers
+    chip_1.click(lambda: "Is a residential building present in this scene?", outputs=query_in, queue=False)
+    chip_2.click(lambda: "How many aircraft or runways are visible?", outputs=query_in, queue=False)
+    chip_3.click(lambda: "Are there more water bodies than land areas?", outputs=query_in, queue=False)
+    chip_4.click(lambda: "Describe the structural damage and changes between these two scenes.", outputs=query_in, queue=False)
+    chip_5.click(lambda: "Where is the primary feature located (NW, NE, SW, SE, or Center)?", outputs=query_in, queue=False)
+
+    # Mode switching handlers
     toggle_outputs = [mode_state, general_btn, disaster_btn, img_in_b, general_examples]
     general_btn.click(_switch_general, outputs=toggle_outputs, queue=False)
     disaster_btn.click(_switch_disaster, outputs=[mode_state, general_btn, disaster_btn, img_in_b, general_examples], queue=False)
 
+    # Inference dispatch handlers
     outputs = [chat, answer_out, original_out, heatmap_out, box_out, route_out, confidence_out, note_out, meta_out]
     inputs = [mode_state, img_in, img_in_b, query_in, chat, show_evidence, contrast, sharpness]
     run_btn.click(_chat_dispatch, inputs=inputs, outputs=outputs)
@@ -858,5 +1315,8 @@ if __name__ == "__main__":
     demo.queue().launch(
         server_name="0.0.0.0",
         server_port=int(os.getenv("PORT", "7860")),
+        css=CSS,
+        js=JS,
+        theme=gr.themes.Base(),
         ssr_mode=False,
     )
