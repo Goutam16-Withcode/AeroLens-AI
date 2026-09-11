@@ -12,3 +12,13 @@ python-dotenv>=1.0.0
 groq>=0.11.0
 google-generativeai>=0.3.0
 openai>=1.0.0
+
+# Gradio & Qwen3-VL VLM Dependencies
+gradio>=4.0.0
+torch>=2.0.0
+transformers>=4.45.0
+accelerate>=0.26.0
+bitsandbytes>=0.43.0
+matplotlib>=3.5.0
+rasterio>=1.3.0
+
