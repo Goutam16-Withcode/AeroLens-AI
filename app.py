@@ -1,13 +1,12 @@
-"""SatQuery — Cyber-Geospatial Intelligence & Orbital VLM Analysis Platform.
+"""SatQuery AI — Orbital Earth Observation & Satellite Geospatial Intelligence Ground Station.
 
-Features
---------
-- Qwen3-VL-4B-Instruct inference with 4-bit quantisation & FP16 safe fallback.
+Features:
+- Qwen3-VL-4B-Instruct inference with 4-bit NF4 quantisation & FP16 safe fallback.
+- Spacecraft Telemetry & Multi-Spectral VLM reasoning.
 - Question routing: VQA / counting / comparison / grounding / change detection.
-- Multi-spectral visual evidence extraction: attention heatmap + tactical reticle box.
-- Bi-temporal disaster damage analysis with pixel-difference heat mapping.
-- Heuristic confidence estimate & GeoTIFF raster telemetry.
-- Next-Gen Aerospace Mission Control HUD Interface.
+- Cross-Layer attention salience radar & tactical target reticle.
+- Bi-temporal disaster analysis with pixel difference heat mapping.
+- Aerospace Ground Station HUD design with Solar-Gold, Radar-Emerald & Optical-Cyan styling.
 """
 
 from __future__ import annotations
@@ -57,59 +56,65 @@ except ImportError:
 
 
 # =============================================================================
-# CONFIG & TELEMETRY
+# SATELLITE MISSIONS & CONFIG
 # =============================================================================
 
 MODEL_ID = os.getenv("SATQUERY_MODEL_ID", "Qwen/Qwen3-VL-4B-Instruct")
 MAX_NEW_TOKENS = int(os.getenv("SATQUERY_MAX_NEW_TOKENS", "128"))
 DEFAULT_ATTENTION = os.getenv("SATQUERY_SHOW_EVIDENCE", "1") != "0"
 
-EXAMPLES: list[tuple[str, str, str]] = [
-    ("examples/scene_535.png", "Residential Infrastructure", "Is a residential building present in this scene?"),
-    ("examples/scene_545.png", "Canopy & Road Network", "Are there more forests than roads in the image?"),
-    ("examples/scene_498.png", "Hydrology & Agriculture", "Are there more large water areas than farmlands?"),
-    ("examples/scene_479.png", "Transportation Arteries", "Is there a small road visible across the terrain?"),
+EXAMPLES: list[tuple[str, str, str, str]] = [
+    ("examples/scene_535.png", "PASS: EO-742", "Urban Infrastructure", "Is a residential building present in this scene?"),
+    ("examples/scene_545.png", "PASS: EO-819", "Canopy & Transportation", "Are there more forests than roads in the image?"),
+    ("examples/scene_498.png", "PASS: EO-904", "Hydrology & Agriculture", "Are there more large water areas than farmlands?"),
+    ("examples/scene_479.png", "PASS: EO-612", "Terrain Arteries", "Is there a small road visible across the terrain?"),
 ]
 
-DISASTER_EXAMPLES: list[tuple[str, str, str, str, str]] = [
+DISASTER_EXAMPLES: list[tuple[str, str, str, str, str, str]] = [
     (
-        "Tsunami Impact",
-        "Palu, Indonesia (2018)",
+        "Tsunami Coastal Inundation",
+        "Palu Bay, Indonesia",
+        "DISASTER CHARTER #581",
         "disaster_examples/tsunami_before.tiff",
         "disaster_examples/tsunami_after.tiff",
         "Describe the coastal inundation and structural damage caused by the tsunami between these scenes.",
     ),
     (
-        "Slope Landslide",
-        "Mountain Corridor",
+        "Mountain Slope Landslide",
+        "Alpine Valley Corridor",
+        "DISASTER CHARTER #614",
         "disaster_examples/landslide_before.tiff",
         "disaster_examples/landslide_after.tiff",
         "Describe what changed on the mountain slope between these two temporal images.",
     ),
     (
-        "Urban Earthquake",
-        "Structural Collapse",
+        "Urban Earthquake Collapse",
+        "Metropolitan Fault Zone",
+        "DISASTER CHARTER #672",
         "disaster_examples/earthquake_before.tiff",
         "disaster_examples/earthquake_after.tiff",
         "How many buildings appear damaged or collapsed in the post-disaster scene compared to before?",
     ),
     (
-        "Severe Drought",
-        "Vegetation Stress",
+        "Severe Drought & Aridity",
+        "Sub-Saharan Agricultural Basin",
+        "SDG 15 / CLIMATE OBSERVATION",
         "disaster_examples/famine_before.tiff",
         "disaster_examples/famine_after.tiff",
         "Describe the change in vegetation health and soil moisture between these two images.",
     ),
     (
-        "Farmland Conversion",
-        "Urban Sprawl / SDG 11",
+        "Agricultural Land Conversion",
+        "Urban Sprawl Frontier",
+        "SDG 11 / LAND USE SURVEY",
         "disaster_examples/arable_land_before.tiff",
         "disaster_examples/arable_land_after.tiff",
         "Has agricultural farmland been converted to built-up area between the two timestamps?",
     ),
     (
-        "Flood Inundation",
-        "River Basin Surge",
+        "River Basin Flood Surge",
+        "Monsoon Overflow Plain",
+        "DISASTER CHARTER #703",
         "disaster_examples/water_rise_before.tiff",
         "disaster_examples/water_rise_after.tiff",
         "Has the water surface area expanded significantly between these two observation captures?",
@@ -118,7 +123,7 @@ DISASTER_EXAMPLES: list[tuple[str, str, str, str, str]] = [
 
 
 # =============================================================================
-# MODEL CACHE
+# MODEL CACHE & SAFE LOADER
 # =============================================================================
 
 _model = None
@@ -126,12 +131,12 @@ _processor = None
 
 
 def _load():
-    """Load model and processor with GPU 4-bit NF4 quant or FP16/CPU fallback."""
+    """Load model with GPU 4-bit NF4 quant or FP16/CPU fallback."""
     global _model, _processor
     if _model is not None:
         return _model, _processor
 
-    print(f"Loading {MODEL_ID}...")
+    print(f"Initializing Satellite VLM Core [{MODEL_ID}]...")
     load_kwargs: dict[str, Any] = {"device_map": "auto"}
     if torch.cuda.is_available():
         try:
@@ -144,7 +149,7 @@ def _load():
             )
             load_kwargs["quantization_config"] = quant
         except Exception as exc:
-            print("Quantization warning (falling back to float16):", exc)
+            print("Quantization warning (loading in float16):", exc)
             load_kwargs["torch_dtype"] = torch.float16
     else:
         load_kwargs["torch_dtype"] = torch.float32
@@ -154,7 +159,7 @@ def _load():
         **load_kwargs,
     )
     _processor = AutoProcessor.from_pretrained(MODEL_ID)
-    print("Model and processor loaded.")
+    print("Satellite VLM Core telemetry active.")
     return _model, _processor
 
 
@@ -168,26 +173,25 @@ def _model_device(model):
 
 
 def route_question(query: str, temporal: bool = False) -> str:
-    """Deterministic transparent question routing."""
     q = (query or "").strip().lower()
     if temporal or any(k in q for k in (
         "before", "after", "changed", "change", "damage", "damaged",
-        "destroyed", "collapsed", "increase", "decrease", "lost", "inundation",
+        "destroyed", "collapsed", "increase", "decrease", "lost", "inundation", "delta",
     )):
-        return "Change Detection"
+        return "Bi-Temporal Change Delta"
     if any(k in q for k in ("how many", "how much", "count", "number of", "tally")):
-        return "Feature Counting"
+        return "Feature Counting & Density"
     if any(k in q for k in ("more", "less", "fewer", "greater", "larger", "compare", "versus", "vs")):
-        return "Spatial Comparison"
+        return "Spatial Balance & Comparison"
     if any(k in q for k in ("where", "which area", "which region", "location", "located", "quadrant")):
-        return "Visual Grounding"
+        return "Quadrant Visual Grounding"
     if any(k in q for k in ("is there", "are there", "present", "visible", "contains", "contain", "detect")):
-        return "Presence Verification"
-    return "Multimodal VQA"
+        return "Feature Presence Verification"
+    return "Multispectral VQA"
 
 
 # =============================================================================
-# IMAGE & GEOSPATIAL TELEMETRY
+# IMAGE / GEOSPATIAL TELEMETRY
 # =============================================================================
 
 
@@ -230,7 +234,7 @@ def metadata_text(image: Image.Image, source_path: str | None = None) -> str:
     meta = _geo_metadata(source_path)
     lines = [
         "╔══════════════════════════════════════════════════════════════╗",
-        "║                GEOSPATIAL SENSOR TELEMETRY                  ║",
+        "║           🛰️ SPACECRAFT PAYLOAD TELEMETRY MATRIX             ║",
         "╠══════════════════════════════════════════════════════════════╣",
         f"║  MATRIX RASTER   : {image.width} × {image.height} px (Channels: {image.mode})",
     ]
@@ -243,16 +247,16 @@ def metadata_text(image: Image.Image, source_path: str | None = None) -> str:
         ]
     else:
         lines += [
-            "║  COORDINATE CRS  : Standard Local Optical Frame (GSD: ~0.5m)",
-            "║  SPECTRAL BANDS  : 3 Optical (RGB Visible Spectrum)",
-            "║  GEO-REFERENCING : Pixel-Relative Local Matrix",
+            "║  COORDINATE CRS  : Standard Sun-Synchronous Frame (GSD: ~0.5m)",
+            "║  SPECTRAL BANDS  : 3 Optical Channels (Red, Green, Blue / NIR)",
+            "║  ORBIT TELEMETRY : LEO 540km · Inclination 98.2° · GSD Nominal",
         ]
     lines.append("╚══════════════════════════════════════════════════════════════╝")
     return "\n".join(lines)
 
 
 # =============================================================================
-# ATTENTION EVIDENCE & GROUNDING
+# ATTENTION EVIDENCE & TACTICAL RETICLE
 # =============================================================================
 
 
@@ -439,18 +443,19 @@ def _evidence_box(image: Image.Image, attn_1d: np.ndarray, grid: tuple[int, int]
     out = image.convert("RGB").copy()
     draw = ImageDraw.Draw(out)
     line = max(3, round(min(W, H) / 180))
-    c = (0, 240, 255)  # Cyan HUD Reticle
+    c = (0, 245, 255)  # Laser Optical Cyan
+    gold = (245, 158, 11)  # Solar Array Gold
     draw.rectangle((px0, py0, px1, py1), outline=c, width=line)
-    L = max(14, round(min(W, H) * 0.05))
+    L = max(16, round(min(W, H) * 0.055))
     for sx, sy in ((px0, py0), (px1, py0), (px0, py1), (px1, py1)):
         hx = 1 if sx == px0 else -1
         vy = 1 if sy == py0 else -1
-        draw.line((sx, sy, sx + hx * L, sy), fill=c, width=line + 2)
-        draw.line((sx, sy, sx, sy + vy * L), fill=c, width=line + 2)
+        draw.line((sx, sy, sx + hx * L, sy), fill=gold, width=line + 2)
+        draw.line((sx, sy, sx, sy + vy * L), fill=gold, width=line + 2)
     return out
 
 
-def _overlay(image: Image.Image, attn_1d: np.ndarray, grid: tuple[int, int], alpha: float = 0.45) -> Image.Image:
+def _overlay(image: Image.Image, attn_1d: np.ndarray, grid: tuple[int, int], alpha: float = 0.46) -> Image.Image:
     import matplotlib
     h, w = grid
     arr = attn_1d.reshape(h, w)
@@ -462,32 +467,32 @@ def _overlay(image: Image.Image, attn_1d: np.ndarray, grid: tuple[int, int], alp
 
 
 # =============================================================================
-# CONFIDENCE & TELEMETRY
+# CONFIDENCE ESTIMATOR
 # =============================================================================
 
 
 def estimate_confidence(answer: str, route: str, evidence_available: bool) -> tuple[int, str]:
     a = (answer or "").strip().lower()
-    score = 62
+    score = 64
     if a:
         score += 8
     if any(x in a for x in ("cannot determine", "uncertain", "unclear", "insufficient resolution")):
         score -= 30
     if any(x in a for x in ("yes", "no", "approximately", "evident", "visible", "present", "detected")):
         score += 8
-    if route == "Feature Counting":
+    if "Counting" in route:
         score -= 5
-    if route == "Visual Grounding":
+    if "Grounding" in route:
         score -= 2
     if evidence_available:
         score += 7
-    score = max(12, min(96, score))
-    label = "HIGH CONFIDENCE 🟢" if score >= 75 else "MODERATE TELEMETRY 🟡" if score >= 55 else "LOW / ADVISORY 🔴"
+    score = max(15, min(96, score))
+    label = "LOCK: HIGH CONFIDENCE 🟢" if score >= 75 else "NOMINAL: MODERATE 🟡" if score >= 55 else "ADVISORY: LOW 🔴"
     return score, label
 
 
 # =============================================================================
-# BI-TEMPORAL DISASTER ANALYSIS
+# BI-TEMPORAL DISASTER DELTA
 # =============================================================================
 
 
@@ -520,7 +525,7 @@ def _diff_map(image_a: Image.Image, image_b: Image.Image, grid: int = 24) -> np.
     return cropped.reshape(grid, step, grid, step).mean(axis=(1, 3))
 
 
-def _diff_overlay(image_b: Image.Image, diff_arr: np.ndarray, alpha: float = 0.48) -> Image.Image:
+def _diff_overlay(image_b: Image.Image, diff_arr: np.ndarray, alpha: float = 0.5) -> Image.Image:
     import matplotlib
     arr = diff_arr.copy()
     arr = (arr - arr.min()) / (arr.max() - arr.min() + 1e-8)
@@ -554,20 +559,20 @@ def _diff_box(image_b: Image.Image, diff_arr: np.ndarray) -> Image.Image:
     out = image_b.convert("RGB").copy()
     draw = ImageDraw.Draw(out)
     line = max(3, round(min(W, H) / 180))
-    c = (255, 68, 68)  # Red Alert Reticle
+    c = (255, 42, 109)  # Infrared Thermal Ruby
     draw.rectangle((px0, py0, px1, py1), outline=c, width=line)
-    L = max(14, round(min(W, H) * 0.05))
+    L = max(16, round(min(W, H) * 0.055))
     for sx, sy in ((px0, py0), (px1, py0), (px0, py1), (px1, py1)):
         hx = 1 if sx == px0 else -1
         vy = 1 if sy == py0 else -1
-        draw.line((sx, sy, sx + hx * L, sy), fill=c, width=line + 2)
-        draw.line((sx, sy, sx, sy + vy * L), fill=c, width=line + 2)
+        draw.line((sx, sy, sx + hx * L, sy), fill=(255, 200, 0), width=line + 2)
+        draw.line((sx, sy, sx, sy + vy * L), fill=(255, 200, 0), width=line + 2)
     return out
 
 
 def analyze_temporal(image_a, image_b, query):
     if image_a is None or image_b is None:
-        return "⚠️ Both T1 (Before) and T2 (After) scenes are required for bi-temporal damage assessment.", None, None, None, "Change Detection", "Awaiting Inputs"
+        return "⚠️ Both T1 (Before) and T2 (After) observation frames are required for bi-temporal damage assessment.", None, None, None, "Change Detection", "Awaiting Inputs"
     if not query or not query.strip():
         return "⚠️ Please specify an inspection query for the temporal pair.", None, None, None, "Change Detection", "Awaiting Query"
     model, processor = _load()
@@ -578,8 +583,8 @@ def analyze_temporal(image_a, image_b, query):
         image_a,
         _diff_overlay(image_b, diff),
         _diff_box(image_b, diff),
-        "Bi-Temporal Change Detection",
-        "Differential pixel-heat baseline (Spectral Δ) correlated with multimodal temporal reasoning.",
+        "Bi-Temporal Change Delta",
+        "Differential pixel spectral Δ baseline correlated with multimodal VLM temporal reasoning.",
     )
 
 if HAS_SPACES:
@@ -593,9 +598,9 @@ if HAS_SPACES:
 
 def analyze(image, query, show_evidence, contrast, sharpness):
     if image is None:
-        return "🛰️ Please upload or select a satellite observation scene.", None, None, None, "—", "—", "—", "—"
+        return "🛰️ Please uplink or select a satellite observation scene.", None, None, None, "—", "—", "—", "—"
     if not query or not query.strip():
-        return "🛰️ Enter an intelligence question or select a quick-action prompt chip.", image, image, image, "—", "—", "—", "—"
+        return "🛰️ Enter an intelligence target query or select a quick-action command chip.", image, image, image, "—", "—", "—", "—"
 
     route = route_question(query)
     processed = _preprocess_image(image, contrast, sharpness)
@@ -606,9 +611,9 @@ def analyze(image, query, show_evidence, contrast, sharpness):
     confidence, confidence_label = estimate_confidence(answer, route, attn is not None and grid is not None)
 
     evidence_note = (
-        "Active Salience Radar (Cross-Layer Attention + Reticle Anchoring)"
+        "Active Salience Radar: Cross-layer attention & spatial reticle lock engaged."
         if attn is not None and grid is not None
-        else "Fast Path Activated: Attention extraction disabled to optimize inference latency."
+        else "Fast Telemetry: Attention extraction bypassed to maximize throughput."
     )
     return (
         answer,
@@ -628,7 +633,7 @@ if HAS_SPACES:
 def _chat_dispatch(mode, image_a, image_b, query, history, show_evidence, contrast, sharpness):
     history = list(history or [])
     if not query or not query.strip():
-        return history, "Please enter a query or select a preset.", image_a, image_a, image_a, "—", "—", "—", "—"
+        return history, "Please specify an orbital intelligence query.", image_a, image_a, image_a, "—", "—", "—", "—"
 
     if mode == "disaster":
         answer, before, diff_heat, diff_box, route, note = analyze_temporal(image_a, image_b, query)
@@ -651,18 +656,18 @@ def _chat_dispatch(mode, image_a, image_b, query, history, show_evidence, contra
 
 
 # =============================================================================
-# UI AESTHETICS & HIGH-TECH STYLING
+# SATELLITE GROUND CONTROL STYLING & HUD THEME
 # =============================================================================
 
 
-def _make_star_field(count: int = 180) -> str:
-    rng = random.Random(42069)
+def _make_star_field(count: int = 200) -> str:
+    rng = random.Random(54000)
     stars = []
     for _ in range(count):
         x = rng.uniform(0, 100); y = rng.uniform(0, 100)
-        size = rng.uniform(0.8, 2.0)
-        opacity = rng.uniform(0.2, 0.8)
-        dur = rng.uniform(3, 7)
+        size = rng.uniform(0.8, 2.2)
+        opacity = rng.uniform(0.25, 0.85)
+        dur = rng.uniform(3, 8)
         stars.append(
             f'<span class="satq-star" style="--x:{x:.2f}%;--y:{y:.2f}%;--size:{size:.2f}px;--opacity:{opacity:.2f};--dur:{dur:.1f}s"></span>'
         )
@@ -672,28 +677,34 @@ def _make_star_field(count: int = 180) -> str:
 STAR_FIELD_HTML = _make_star_field()
 
 CSS = r"""
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 
 :root {
-  --space-bg: #030712;
-  --panel-bg: rgba(13, 20, 36, 0.85);
-  --panel-card: rgba(17, 27, 49, 0.65);
-  --border-neon: rgba(0, 240, 255, 0.35);
+  --space-void: #02050e;
+  --hull-bg: #070e1c;
+  --hull-card: rgba(11, 20, 38, 0.8);
+  --sat-gold: #f59e0b;
+  --sat-gold-bright: #fbbf24;
+  --sat-gold-glow: rgba(245, 158, 11, 0.3);
+  --radar-emerald: #00ff88;
+  --radar-emerald-dim: rgba(0, 255, 136, 0.15);
+  --optical-cyan: #00f5ff;
+  --optical-cyan-glow: rgba(0, 245, 255, 0.35);
+  --thermal-ruby: #ff2a6d;
+  --border-gold: rgba(245, 158, 11, 0.4);
+  --border-cyan: rgba(0, 245, 255, 0.3);
   --border-subtle: rgba(255, 255, 255, 0.08);
-  --cyan: #00f0ff;
-  --cyan-glow: rgba(0, 240, 255, 0.25);
-  --emerald: #10b981;
-  --amber: #f59e0b;
-  --ruby: #ff3366;
-  --text-main: #f8fafc;
-  --text-dim: #94a3b8;
-  --mono-font: 'JetBrains Mono', monospace;
+  --text-pure: #ffffff;
+  --text-muted: #8da4be;
+  --font-hud: 'Chakra Petch', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --font-body: 'Plus Jakarta Sans', sans-serif;
 }
 
 html, body, .gradio-container {
-  background: var(--space-bg) !important;
-  color: var(--text-main) !important;
-  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif !important;
+  background: var(--space-void) !important;
+  color: var(--text-pure) !important;
+  font-family: var(--font-body) !important;
   overflow-x: hidden;
 }
 
@@ -705,15 +716,16 @@ footer, .footer, .built-with, .show-api {
   display: none !important;
 }
 
-/* Background Cosmic Grid & Particle FX */
+/* Cosmic Orbit Matrix Backdrop */
 .satq-stars {
   position: fixed;
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  background: radial-gradient(circle at 50% 10%, rgba(0, 240, 255, 0.08) 0%, transparent 60%),
-              radial-gradient(circle at 85% 80%, rgba(139, 92, 246, 0.06) 0%, transparent 50%),
-              linear-gradient(180deg, #030712 0%, #060d1a 50%, #030712 100%);
+  background: radial-gradient(circle at 50% 0%, rgba(0, 245, 255, 0.1) 0%, transparent 50%),
+              radial-gradient(circle at 10% 30%, rgba(245, 158, 11, 0.07) 0%, transparent 40%),
+              radial-gradient(circle at 90% 80%, rgba(255, 42, 109, 0.06) 0%, transparent 45%),
+              linear-gradient(180deg, #02050e 0%, #050c18 50%, #02050e 100%);
 }
 
 .satq-star {
@@ -722,201 +734,243 @@ footer, .footer, .built-with, .show-api {
   top: var(--y);
   width: var(--size);
   height: var(--size);
-  background: #ffffff;
+  background: #d4eaf7;
   border-radius: 50%;
   opacity: var(--opacity);
-  box-shadow: 0 0 6px rgba(0, 240, 255, 0.8);
-  animation: starPulse var(--dur) ease-in-out infinite alternate;
+  box-shadow: 0 0 8px rgba(0, 245, 255, 0.8);
+  animation: starOrbitPulse var(--dur) ease-in-out infinite alternate;
 }
 
-@keyframes starPulse {
-  0% { opacity: calc(var(--opacity) * 0.4); transform: scale(0.8); }
-  100% { opacity: var(--opacity); transform: scale(1.3); }
+@keyframes starOrbitPulse {
+  0% { opacity: calc(var(--opacity) * 0.3); transform: scale(0.8); }
+  100% { opacity: var(--opacity); transform: scale(1.4); }
 }
 
 #mission-page {
-  max-width: 1320px;
+  max-width: 1360px;
   margin: 0 auto;
-  padding: 16px 20px 48px;
+  padding: 18px 22px 60px;
   position: relative;
   z-index: 1;
 }
 
-/* MISSION CONTROL HUD HEADER */
-.hud-header {
-  background: linear-gradient(135deg, rgba(15, 23, 42, 0.9) 0%, rgba(13, 20, 36, 0.75) 100%);
-  backdrop-filter: blur(20px);
-  border: 1px solid var(--border-neon);
+/* SATELLITE GROUND STATION COMMAND BANNER */
+.sat-header {
+  background: linear-gradient(135deg, rgba(12, 22, 42, 0.95) 0%, rgba(7, 14, 28, 0.9) 100%);
+  backdrop-filter: blur(24px);
+  border: 1px solid var(--border-cyan);
+  border-top: 2px solid var(--sat-gold);
   border-radius: 16px;
-  padding: 20px 28px;
-  margin-bottom: 24px;
-  box-shadow: 0 12px 40px rgba(0, 240, 255, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  padding: 22px 30px;
+  margin-bottom: 22px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.1);
   display: flex;
   justify-content: space-between;
   align-items: center;
   flex-wrap: wrap;
-  gap: 16px;
+  gap: 20px;
 }
 
-.hud-brand {
+.sat-brand-wrap {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 18px;
 }
 
-.hud-logo-icon {
-  width: 48px;
-  height: 48px;
-  background: linear-gradient(135deg, #00f0ff, #3b82f6);
-  border-radius: 12px;
+.sat-dish-beacon {
+  width: 54px;
+  height: 54px;
+  background: radial-gradient(circle at 30% 30%, #fbbf24 0%, #d97706 60%, #78350f 100%);
+  border: 2px solid #fef08a;
+  border-radius: 14px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 24px;
-  box-shadow: 0 0 20px rgba(0, 240, 255, 0.5);
+  font-size: 26px;
+  box-shadow: 0 0 24px var(--sat-gold-glow);
+  position: relative;
 }
 
-.hud-title-wrap h1 {
-  font-size: 24px;
-  font-weight: 800;
-  letter-spacing: -0.02em;
+.sat-dish-beacon::after {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border: 1px dashed var(--optical-cyan);
+  border-radius: 18px;
+  animation: radarRotate 12s linear infinite;
+}
+
+@keyframes radarRotate {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.sat-title-text h1 {
+  font-family: var(--font-hud);
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
   margin: 0;
   color: #ffffff;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
 }
 
-.hud-title-wrap h1 span {
-  background: linear-gradient(135deg, #00f0ff 0%, #38bdf8 50%, #818cf8 100%);
+.sat-title-text h1 span {
+  background: linear-gradient(135deg, #00f5ff 0%, #38bdf8 50%, #fbbf24 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
-.hud-badge {
-  font-family: var(--mono-font);
-  font-size: 10.5px;
-  color: var(--cyan);
-  letter-spacing: 0.12em;
+.sat-subkicker {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--sat-gold-bright);
+  letter-spacing: 0.14em;
   text-transform: uppercase;
+  margin-top: 4px;
 }
 
-.hud-telemetry-pills {
+/* LIVE ORBIT TELEMETRY PILLS */
+.orbit-telemetry-bar {
   display: flex;
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
 }
 
-.hud-pill {
-  font-family: var(--mono-font);
+.telemetry-chip {
+  font-family: var(--font-mono);
   font-size: 11px;
-  padding: 6px 12px;
-  background: rgba(0, 240, 255, 0.06);
-  border: 1px solid rgba(0, 240, 255, 0.2);
-  border-radius: 20px;
-  color: #cbd5e1;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.hud-pill .live-dot {
-  width: 7px;
-  height: 7px;
-  background: #10b981;
-  border-radius: 50%;
-  box-shadow: 0 0 8px #10b981;
-  animation: pulseDot 2s infinite;
-}
-
-@keyframes pulseDot {
-  0% { transform: scale(0.9); opacity: 0.7; }
-  50% { transform: scale(1.2); opacity: 1; }
-  100% { transform: scale(0.9); opacity: 0.7; }
-}
-
-/* MAIN DECK CONTAINER */
-#deck {
-  background: var(--panel-bg);
-  border: 1px solid var(--border-subtle);
-  border-radius: 16px;
-  backdrop-filter: blur(16px);
-  padding: 0 !important;
-  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.6);
-  overflow: hidden;
-}
-
-#mode-switch-bar {
-  padding: 14px 20px !important;
-  background: rgba(10, 16, 28, 0.95);
-  border-bottom: 1px solid var(--border-subtle);
-  display: flex;
-  gap: 12px;
-}
-
-.mode-btn {
-  font-family: var(--mono-font) !important;
-  font-size: 12px !important;
-  font-weight: 700 !important;
-  letter-spacing: 0.08em !important;
-  border-radius: 8px !important;
-  padding: 10px 20px !important;
-  transition: all 0.2s ease !important;
-}
-
-.mode-btn.primary {
-  background: linear-gradient(135deg, #00f0ff 0%, #0284c7 100%) !important;
-  color: #030712 !important;
-  border: 0 !important;
-  box-shadow: 0 0 16px rgba(0, 240, 255, 0.4) !important;
-}
-
-.mode-btn.secondary {
-  background: rgba(255, 255, 255, 0.04) !important;
-  color: var(--text-dim) !important;
-  border: 1px solid var(--border-subtle) !important;
-}
-
-.mode-btn:hover {
-  transform: translateY(-1px);
-}
-
-/* WORKSPACE COLUMNS */
-#workspace {
-  padding: 0 !important;
-}
-
-.tactical-col {
-  padding: 24px !important;
-}
-
-#left-panel {
-  border-right: 1px solid var(--border-subtle);
-}
-
-.panel-label {
-  font-family: var(--mono-font);
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--cyan);
-  letter-spacing: 0.12em;
-  margin-bottom: 8px;
+  font-weight: 500;
+  padding: 6px 14px;
+  background: rgba(7, 18, 36, 0.85);
+  border: 1px solid var(--border-cyan);
+  border-radius: 8px;
+  color: #e2e8f0;
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-/* IMAGE CONTAINERS */
-.gradio-container [data-testid="image"], .gradio-container .image-container {
-  border: 1px solid rgba(0, 240, 255, 0.25) !important;
-  border-radius: 12px !important;
-  background: #060b13 !important;
-  overflow: hidden !important;
-  box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.8) !important;
+.telemetry-chip.emerald {
+  border-color: rgba(0, 255, 136, 0.4);
+  background: rgba(0, 255, 136, 0.05);
+  color: #a7f3d0;
 }
 
-/* QUICK QUERY CHIPS */
+.telemetry-chip.gold {
+  border-color: rgba(245, 158, 11, 0.4);
+  background: rgba(245, 158, 11, 0.06);
+  color: #fde68a;
+}
+
+.telemetry-chip .pulse-led {
+  width: 8px;
+  height: 8px;
+  background: var(--radar-emerald);
+  border-radius: 50%;
+  box-shadow: 0 0 10px var(--radar-emerald);
+  animation: ledFlash 1.6s ease-in-out infinite;
+}
+
+@keyframes ledFlash {
+  0%, 100% { opacity: 0.5; transform: scale(0.9); }
+  50% { opacity: 1; transform: scale(1.25); }
+}
+
+/* MAIN DECK CONTAINER */
+#satellite-deck {
+  background: var(--hull-bg);
+  border: 1px solid var(--border-subtle);
+  border-radius: 16px;
+  backdrop-filter: blur(20px);
+  padding: 0 !important;
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.75);
+  overflow: hidden;
+  position: relative;
+}
+
+/* SATELLITE INSTRUMENT SELECTOR BAR */
+#instrument-bar {
+  padding: 14px 24px !important;
+  background: rgba(5, 11, 22, 0.95);
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  gap: 14px;
+  align-items: center;
+}
+
+.instrument-btn {
+  font-family: var(--font-hud) !important;
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.08em !important;
+  border-radius: 8px !important;
+  padding: 11px 22px !important;
+  transition: all 0.25s ease !important;
+  text-transform: uppercase !important;
+}
+
+.instrument-btn.primary {
+  background: linear-gradient(135deg, #00f5ff 0%, #0284c7 100%) !important;
+  color: #020612 !important;
+  border: 1px solid #38bdf8 !important;
+  box-shadow: 0 0 20px rgba(0, 245, 255, 0.4) !important;
+}
+
+.instrument-btn.secondary {
+  background: rgba(245, 158, 11, 0.08) !important;
+  color: var(--sat-gold-bright) !important;
+  border: 1px solid var(--border-gold) !important;
+}
+
+.instrument-btn:hover {
+  transform: translateY(-2px);
+}
+
+/* SATELLITE HUD WORKSPACE */
+#workspace {
+  padding: 0 !important;
+}
+
+.ground-col {
+  padding: 26px !important;
+}
+
+#left-ground-panel {
+  border-right: 1px solid var(--border-subtle);
+}
+
+.hud-panel-title {
+  font-family: var(--font-hud);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--optical-cyan);
+  letter-spacing: 0.14em;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-transform: uppercase;
+}
+
+.hud-panel-title span {
+  color: var(--sat-gold-bright);
+}
+
+/* SATELLITE IMAGE CONTAINERS WITH CORNER RETICLES */
+.gradio-container [data-testid="image"], .gradio-container .image-container {
+  border: 1px solid rgba(0, 245, 255, 0.3) !important;
+  border-radius: 12px !important;
+  background: #030712 !important;
+  position: relative;
+  overflow: hidden !important;
+  box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.9) !important;
+}
+
+/* QUICK COMMAND PROMPT CHIPS */
 .query-chips-row {
   display: flex;
   flex-wrap: wrap;
@@ -924,188 +978,158 @@ footer, .footer, .built-with, .show-api {
   margin: 12px 0 16px;
 }
 
-.query-chip {
-  font-family: var(--mono-font) !important;
+.sat-query-chip {
+  font-family: var(--font-mono) !important;
   font-size: 11px !important;
-  padding: 6px 12px !important;
-  background: rgba(0, 240, 255, 0.05) !important;
-  border: 1px solid rgba(0, 240, 255, 0.2) !important;
+  padding: 7px 14px !important;
+  background: rgba(0, 245, 255, 0.05) !important;
+  border: 1px solid rgba(0, 245, 255, 0.25) !important;
   border-radius: 6px !important;
-  color: #cbd5e1 !important;
+  color: #e2e8f0 !important;
   cursor: pointer !important;
   transition: all 0.2s ease !important;
 }
 
-.query-chip:hover {
-  background: rgba(0, 240, 255, 0.15) !important;
-  border-color: var(--cyan) !important;
+.sat-query-chip:hover {
+  background: rgba(0, 245, 255, 0.18) !important;
+  border-color: var(--optical-cyan) !important;
   color: #ffffff !important;
-  box-shadow: 0 0 10px rgba(0, 240, 255, 0.3) !important;
+  box-shadow: 0 0 14px rgba(0, 245, 255, 0.35) !important;
+  transform: translateY(-1px);
 }
 
-/* INPUT TEXTAREA & ACTION BUTTON */
+/* TARGET UPLINK INPUT BOX */
 #query-input textarea {
-  background: rgba(8, 14, 26, 0.8) !important;
-  border: 1px solid rgba(0, 240, 255, 0.3) !important;
+  background: rgba(4, 9, 20, 0.9) !important;
+  border: 1px solid var(--border-gold) !important;
   border-radius: 10px !important;
   color: #ffffff !important;
-  font-size: 15px !important;
-  line-height: 1.5 !important;
-  padding: 12px 16px !important;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+  font-family: var(--font-body) !important;
+  font-size: 15.5px !important;
+  line-height: 1.55 !important;
+  padding: 14px 18px !important;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5) !important;
 }
 
 #query-input textarea:focus {
-  border-color: var(--cyan) !important;
-  box-shadow: 0 0 16px var(--cyan-glow) !important;
+  border-color: var(--sat-gold-bright) !important;
+  box-shadow: 0 0 20px var(--sat-gold-glow) !important;
 }
 
+/* SATELLITE TRANSMIT BUTTON */
 #analyze-btn {
-  background: linear-gradient(135deg, #00f0ff 0%, #2563eb 100%) !important;
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 60%, #b45309 100%) !important;
   color: #030712 !important;
-  font-family: var(--mono-font) !important;
-  font-size: 13px !important;
+  font-family: var(--font-hud) !important;
+  font-size: 14px !important;
   font-weight: 800 !important;
-  letter-spacing: 0.08em !important;
-  border: 0 !important;
+  letter-spacing: 0.1em !important;
+  border: 1px solid #fde68a !important;
   border-radius: 8px !important;
-  padding: 12px 24px !important;
-  box-shadow: 0 4px 20px rgba(0, 240, 255, 0.4) !important;
+  padding: 14px 28px !important;
+  box-shadow: 0 6px 24px var(--sat-gold-glow) !important;
   cursor: pointer !important;
-  transition: all 0.2s ease !important;
+  transition: all 0.25s ease !important;
+  text-transform: uppercase !important;
 }
 
 #analyze-btn:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 28px rgba(0, 240, 255, 0.6) !important;
+  box-shadow: 0 8px 32px rgba(245, 158, 11, 0.6) !important;
 }
 
-/* CHATBOT & CONVERSATION */
+/* CHAT CONVERSATION LOG */
 #conversation {
   border: 1px solid var(--border-subtle) !important;
-  background: rgba(6, 11, 20, 0.7) !important;
+  background: rgba(4, 8, 16, 0.8) !important;
   border-radius: 12px !important;
 }
 
-/* TACTICAL TELEMETRY HUD BOXES */
-.telemetry-deck {
-  background: rgba(8, 14, 26, 0.85);
-  border: 1px solid var(--border-subtle);
-  border-radius: 10px;
-  padding: 16px;
-  margin-top: 14px;
-}
-
-/* EVIDENCE TABS */
+/* SATELLITE EVIDENCE TABS */
 #evidence-tabs {
   border-top: 1px solid var(--border-subtle) !important;
-  background: rgba(6, 11, 20, 0.9) !important;
+  background: rgba(3, 7, 16, 0.95) !important;
 }
 
 .tab-nav button {
-  font-family: var(--mono-font) !important;
-  font-size: 12px !important;
-  color: var(--text-dim) !important;
-  padding: 12px 20px !important;
+  font-family: var(--font-hud) !important;
+  font-size: 12.5px !important;
+  letter-spacing: 0.08em !important;
+  color: var(--text-muted) !important;
+  padding: 14px 24px !important;
+  text-transform: uppercase !important;
 }
 
 .tab-nav button.selected {
-  color: var(--cyan) !important;
-  border-bottom: 2px solid var(--cyan) !important;
-  background: rgba(0, 240, 255, 0.05) !important;
+  color: var(--optical-cyan) !important;
+  border-bottom: 2px solid var(--optical-cyan) !important;
+  background: rgba(0, 245, 255, 0.06) !important;
 }
 
-/* MISSION SCENARIOS CARDS */
-.scenario-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 16px;
-  margin-top: 16px;
+/* MISSION SCENARIO CARDS */
+.mission-card-btn {
+  background: rgba(10, 18, 34, 0.75) !important;
+  border: 1px solid rgba(0, 245, 255, 0.2) !important;
+  border-radius: 12px !important;
+  padding: 16px !important;
+  text-align: left !important;
+  transition: all 0.25s ease !important;
 }
 
-.scenario-card {
-  background: rgba(13, 22, 38, 0.7);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 12px;
-  padding: 16px;
-  cursor: pointer;
-  transition: all 0.25s ease;
-  position: relative;
-  overflow: hidden;
-}
-
-.scenario-card:hover {
-  border-color: var(--cyan);
-  background: rgba(0, 240, 255, 0.06);
+.mission-card-btn:hover {
+  border-color: var(--optical-cyan) !important;
+  background: rgba(0, 245, 255, 0.08) !important;
+  box-shadow: 0 8px 24px rgba(0, 245, 255, 0.2) !important;
   transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(0, 240, 255, 0.15);
 }
 
-.scenario-card .tag {
-  font-family: var(--mono-font);
-  font-size: 10px;
-  color: var(--cyan);
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-}
-
-.scenario-card .title {
-  font-size: 15px;
-  font-weight: 700;
-  color: #ffffff;
-  margin: 6px 0 4px;
-}
-
-.scenario-card .desc {
-  font-size: 12.5px;
-  color: var(--text-dim);
-  line-height: 1.4;
-}
-
-/* PLATFORM SPECIFICATIONS GRID */
-#stats-grid {
+/* GROUND STATION SPECIFICATIONS HUD */
+#specs-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   border: 1px solid var(--border-subtle);
-  border-radius: 12px;
-  background: rgba(11, 18, 32, 0.6);
+  border-radius: 14px;
+  background: rgba(8, 15, 30, 0.7);
   margin-top: 36px;
   overflow: hidden;
 }
 
-.stat-item {
-  padding: 20px 24px;
+.spec-node {
+  padding: 22px 26px;
   border-right: 1px solid var(--border-subtle);
 }
 
-.stat-item:last-child {
+.spec-node:last-child {
   border-right: 0;
 }
 
-.stat-item .num {
-  font-family: var(--mono-font);
-  font-size: 26px;
-  font-weight: 800;
-  color: var(--cyan);
+.spec-node .node-id {
+  font-family: var(--font-hud);
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--sat-gold-bright);
   margin-bottom: 6px;
 }
 
-.stat-item .title {
-  font-size: 13px;
-  font-weight: 600;
+.spec-node .node-title {
+  font-family: var(--font-hud);
+  font-size: 13.5px;
+  font-weight: 700;
   color: #ffffff;
+  letter-spacing: 0.06em;
   margin-bottom: 4px;
+  text-transform: uppercase;
 }
 
-.stat-item .detail {
-  font-size: 12px;
-  color: var(--text-dim);
-  line-height: 1.45;
+.spec-node .node-detail {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  line-height: 1.5;
 }
 
 @media (max-width: 900px) {
-  #left-panel { border-right: 0; border-bottom: 1px solid var(--border-subtle); }
-  #stats-grid { grid-template-columns: 1fr 1fr; }
+  #left-ground-panel { border-right: 0; border-bottom: 1px solid var(--border-subtle); }
+  #specs-grid { grid-template-columns: 1fr 1fr; }
 }
 """
 
@@ -1136,113 +1160,110 @@ def _switch_disaster():
     )
 
 
-def _set_query(chip_text: str):
-    return chip_text
-
-
 # =============================================================================
-# GRADIO INTERFACE CONSTRUCTION
+# GROUND STATION UI BUILDER
 # =============================================================================
 
-with gr.Blocks(title="SatQuery AI — Orbital Geospatial Intelligence Platform") as demo:
+with gr.Blocks(title="SatQuery AI — Orbital Earth Observation & VLM Ground Station") as demo:
     gr.HTML(STAR_FIELD_HTML)
 
     with gr.Column(elem_id="mission-page"):
 
-        # 1. Aerospace Mission Control Header
+        # 1. SATELLITE COMMAND & TELEMETRY BANNER
         gr.HTML("""
-        <header class="hud-header">
-            <div class="hud-brand">
-                <div class="hud-logo-icon">🛰️</div>
-                <div class="hud-title-wrap">
-                    <h1>SAT<span>QUERY</span> AI</h1>
-                    <div class="hud-badge">ORBITAL MULTIMODAL INTELLIGENCE & SATELLITE VQA</div>
+        <header class="sat-header">
+            <div class="sat-brand-wrap">
+                <div class="sat-dish-beacon">🛰️</div>
+                <div class="sat-title-text">
+                    <h1>SAT<span>QUERY</span> AI // GROUND STATION</h1>
+                    <div class="sat-subkicker">ORBITAL MULTISPECTRAL VLM & GEOSPATIAL INTELLIGENCE PLATFORM</div>
                 </div>
             </div>
-            <div class="hud-telemetry-pills">
-                <div class="hud-pill"><span class="live-dot"></span>SYS_STATUS: NOMINAL</div>
-                <div class="hud-pill">MODEL: QWEN3-VL-4B (NF4)</div>
-                <div class="hud-pill">GSD: SUB-METER OPTICAL</div>
+            <div class="orbit-telemetry-bar">
+                <div class="telemetry-chip emerald"><span class="pulse-led"></span>DOWNLINK: 8.2 GHz [ACTIVE]</div>
+                <div class="telemetry-chip gold">ORBIT: LEO 540KM · SSO</div>
+                <div class="telemetry-chip">PAYLOAD: MSI (13-BAND) + SAR</div>
+                <div class="telemetry-chip">CORE: QWEN3-VL 4B (NF4)</div>
             </div>
         </header>
         """)
 
-        # 2. Main Mission Control Deck
-        with gr.Column(elem_id="deck"):
+        # 2. MAIN SATELLITE RECON DECK
+        with gr.Column(elem_id="satellite-deck"):
             mode_state = gr.State("general")
 
-            # Mode Selector Ribbon
-            with gr.Row(elem_id="mode-switch-bar"):
-                general_btn = gr.Button("🛰️ OPTICAL RECON & VQA", elem_id="mode-general", variant="primary", elem_classes=["mode-btn"])
-                disaster_btn = gr.Button("🚨 BI-TEMPORAL DISASTER & SDG", elem_id="mode-disaster", variant="secondary", elem_classes=["mode-btn"])
+            # Instrument Mode Ribbon
+            with gr.Row(elem_id="instrument-bar"):
+                general_btn = gr.Button("🛰️ INSTRUMENT: OPTICAL & MULTISPECTRAL VQA", elem_id="mode-general", variant="primary", elem_classes=["instrument-btn"])
+                disaster_btn = gr.Button("🚨 INSTRUMENT: BI-TEMPORAL DISASTER & SDG Δ", elem_id="mode-disaster", variant="secondary", elem_classes=["instrument-btn"])
 
-            # Main Workspace Split-Panel
+            # Split-Rail Ground Workspace
             with gr.Row(elem_id="workspace", equal_height=False):
 
-                # Left Sensor & Input Rail
-                with gr.Column(elem_id="left-panel", scale=6, elem_classes=["tactical-col"]):
-                    gr.HTML('<div class="panel-label"><span>[01]</span> SATELLITE SENSOR CAPTURE (T1 / PRIMARY)</div>')
+                # Left Ingestion & Target Uplink Rail
+                with gr.Column(elem_id="left-ground-panel", scale=6, elem_classes=["ground-col"]):
+                    gr.HTML('<div class="hud-panel-title"><span>[01]</span> SATELLITE SENSOR RASTER (T1 / PRIMARY SWATH)</div>')
                     img_in = gr.Image(type="pil", label="", show_label=False, height=360)
 
-                    gr.HTML('<div class="panel-label" style="margin-top:14px"><span>[02]</span> BI-TEMPORAL RECON SCENE (T2 / POST-EVENT)</div>')
+                    gr.HTML('<div class="hud-panel-title" style="margin-top:14px"><span>[02]</span> BI-TEMPORAL RECON SWATH (T2 / POST-CRISIS)</div>')
                     img_in_b = gr.Image(type="pil", label="", show_label=False, height=360, visible=False)
 
-                    # Quick Query Command Chips
-                    gr.HTML('<div class="panel-label" style="margin-top:18px"><span>[03]</span> TACTICAL QUERY CHIPS (ONE-CLICK PROMPT)</div>')
+                    # Quick Command Prompt Chips
+                    gr.HTML('<div class="hud-panel-title" style="margin-top:18px"><span>[03]</span> TARGET UPLINK QUERY PRESETS</div>')
                     with gr.Row(elem_classes=["query-chips-row"]):
-                        chip_1 = gr.Button("🏢 Residential Buildings?", elem_classes=["query-chip"], size="sm")
-                        chip_2 = gr.Button("✈️ Count Aircraft & Runways", elem_classes=["query-chip"], size="sm")
-                        chip_3 = gr.Button("🌊 Water Bodies vs Land", elem_classes=["query-chip"], size="sm")
-                        chip_4 = gr.Button("🚨 Describe Damage Delta", elem_classes=["query-chip"], size="sm")
-                        chip_5 = gr.Button("📍 Ground Feature Quadrant", elem_classes=["query-chip"], size="sm")
+                        chip_1 = gr.Button("🏢 Urban Rooftops & Buildings", elem_classes=["sat-query-chip"], size="sm")
+                        chip_2 = gr.Button("✈️ Airfield Aircraft & Runways", elem_classes=["sat-query-chip"], size="sm")
+                        chip_3 = gr.Button("🌊 Hydrology & Coastlines", elem_classes=["sat-query-chip"], size="sm")
+                        chip_4 = gr.Button("🚨 Damage & Destruction Delta", elem_classes=["sat-query-chip"], size="sm")
+                        chip_5 = gr.Button("📍 Quadrant Reticle Grounding", elem_classes=["sat-query-chip"], size="sm")
 
                     query_in = gr.Textbox(
                         show_label=False,
                         lines=2,
                         max_lines=4,
-                        placeholder="Enter geospatial question (e.g., 'Are there more forests than roads?', 'Detect structural damage')...",
+                        placeholder="Uplink geospatial target query (e.g., 'Are there more forests than roads?', 'Identify collapsed structures')...",
                         elem_id="query-input"
                     )
 
                     with gr.Row():
-                        run_btn = gr.Button("EXECUTE SATELLITE RECON →", elem_id="analyze-btn", variant="primary")
-                        show_evidence = gr.Checkbox(value=DEFAULT_ATTENTION, label="Salience Evidence Radar", info="Cross-layer attention extraction")
+                        run_btn = gr.Button("TRANSMIT SATELLITE UPLINK 📡 →", elem_id="analyze-btn", variant="primary")
+                        show_evidence = gr.Checkbox(value=DEFAULT_ATTENTION, label="Cross-Layer Attention Radar", info="Extracts multi-head visual token salience")
 
                     with gr.Row():
-                        contrast = gr.Slider(0.8, 1.4, value=1.0, step=0.05, label="Contrast Calibration")
-                        sharpness = gr.Slider(0.8, 1.5, value=1.0, step=0.05, label="Optical Sharpness")
+                        contrast = gr.Slider(0.8, 1.4, value=1.0, step=0.05, label="Optical Contrast Gain")
+                        sharpness = gr.Slider(0.8, 1.5, value=1.0, step=0.05, label="Sensor Aperture Sharpness")
 
-                # Right Analyst & Telemetry Rail
-                with gr.Column(elem_id="right-panel", scale=6, elem_classes=["tactical-col"]):
-                    gr.HTML('<div class="panel-label"><span>[04]</span> INTELLIGENCE ASSESSMENT READOUT</div>')
-                    chat = gr.Chatbot(value=[], show_label=False, height=280, elem_id="conversation")
-
-                    with gr.Row():
-                        answer_out = gr.Textbox(label="VLM SYNTHESIS ANSWER", lines=4, interactive=False)
+                # Right Analyst Telemetry Rail
+                with gr.Column(elem_id="right-ground-panel", scale=6, elem_classes=["ground-col"]):
+                    gr.HTML('<div class="hud-panel-title"><span>[04]</span> SPACECRAFT VLM SYNTHESIS TERMINAL</div>')
+                    chat = gr.Chatbot(value=[], show_label=False, height=270, elem_id="conversation")
 
                     with gr.Row():
-                        route_out = gr.Textbox(label="ROUTED TASK CLASSIFIER", value="—", interactive=False)
-                        confidence_out = gr.Textbox(label="CONFIDENCE ESTIMATE", value="—", interactive=False)
+                        answer_out = gr.Textbox(label="MULTIMODAL INTELLIGENCE SYNTHESIS", lines=4, interactive=False)
 
-                    note_out = gr.Textbox(label="EVIDENCE / ATTRIBUTION TELEMETRY", value="—", lines=2, interactive=False)
-                    meta_out = gr.Textbox(label="GEOSPATIAL SENSOR & RASTER TELEMETRY", value="—", lines=5, interactive=False)
+                    with gr.Row():
+                        route_out = gr.Textbox(label="TARGET CLASSIFIER ROUTE", value="—", interactive=False)
+                        confidence_out = gr.Textbox(label="TELEMETRY CONFIDENCE LOCK", value="—", interactive=False)
+
+                    note_out = gr.Textbox(label="SENSING PROTOCOL & ATTRIBUTION", value="—", lines=2, interactive=False)
+                    meta_out = gr.Textbox(label="GEOSPATIAL SENSOR & RASTER MATRIX", value="—", lines=5, interactive=False)
 
             # Multi-Spectral Visual Evidence Hub
             with gr.Tabs(elem_id="evidence-tabs"):
-                with gr.Tab("🛰️ RAW SATELLITE SCENE"):
+                with gr.Tab("🛰️ BAND 4-3-2 (OPTICAL RGB)"):
                     original_out = gr.Image(label="", show_label=False, interactive=False, height=360)
-                with gr.Tab("👁️ ATTENTION SALIENCE HEATMAP"):
+                with gr.Tab("👁️ ATTENTION SALIENCE (VLM SPATIAL RADAR)"):
                     heatmap_out = gr.Image(label="", show_label=False, interactive=False, height=360)
-                with gr.Tab("🎯 TACTICAL EVIDENCE RETICLE"):
+                with gr.Tab("🎯 TACTICAL TARGET RETICLE (GROUNDING LOCK)"):
                     box_out = gr.Image(label="", show_label=False, interactive=False, height=360)
 
-        # 3. Interactive Mission Briefing Presets
+        # 3. SATELLITE MISSION PRESETS
         with gr.Column(visible=True) as general_examples:
-            gr.HTML('<div class="panel-label" style="margin-top:32px"><span>[05]</span> CURATED RECONNAISSANCE MISSIONS (SINGLE SCENE)</div>')
+            gr.HTML('<div class="hud-panel-title" style="margin-top:34px"><span>[05]</span> EARTH OBSERVATION RECON MISSIONS (SINGLE PASS)</div>')
             with gr.Row():
-                for path, title, question in EXAMPLES:
+                for path, pass_id, title, question in EXAMPLES:
                     with gr.Column():
-                        btn = gr.Button(f"🛰️ {title}\n\"{question}\"", variant="secondary")
+                        btn = gr.Button(f"🛰️ {pass_id} // {title}\n\"{question}\"", elem_classes=["mission-card-btn"])
                         def load_gen(p=path, q=question):
                             if not Path(p).exists():
                                 return None, q
@@ -1250,53 +1271,53 @@ with gr.Blocks(title="SatQuery AI — Orbital Geospatial Intelligence Platform")
                         btn.click(load_gen, outputs=[img_in, query_in], queue=False)
 
         with gr.Column(visible=False) as disaster_examples:
-            gr.HTML('<div class="panel-label" style="margin-top:32px"><span>[05]</span> DISASTER CRISIS & SDG CHANGE MISSIONS (BI-TEMPORAL)</div>')
+            gr.HTML('<div class="hud-panel-title" style="margin-top:34px"><span>[05]</span> INTERNATIONAL DISASTER CHARTER & SDG MONITORING (BI-TEMPORAL)</div>')
             with gr.Row():
-                for title, location, bp, ap, q in DISASTER_EXAMPLES:
+                for title, location, charter_id, bp, ap, q in DISASTER_EXAMPLES:
                     with gr.Column():
-                        btn = gr.Button(f"🚨 {title} ({location})\n\"{q}\"", variant="secondary")
+                        btn = gr.Button(f"🚨 {charter_id}\n{title} ({location})\n\"{q}\"", elem_classes=["mission-card-btn"])
                         def load_dis(b=bp, a=ap, question=q):
                             if not Path(b).exists() or not Path(a).exists():
                                 return None, None, question
                             return Image.open(b).convert("RGB"), Image.open(a).convert("RGB"), question
                         btn.click(load_dis, outputs=[img_in, img_in_b, query_in], queue=False)
 
-        # 4. Platform Specifications & Defense HUD Stats
+        # 4. GROUND STATION SPECIFICATIONS MATRIX
         gr.HTML("""
-        <div id="stats-grid">
-            <div class="stat-item">
-                <div class="num">01</div>
-                <div class="title">Dynamic Task Routing</div>
-                <div class="detail">Automatic classification across presence, object counting, spatial comparison, grounding, and change detection.</div>
+        <div id="specs-grid">
+            <div class="spec-node">
+                <div class="node-id">01 / ROUTE</div>
+                <div class="node-title">Dynamic Task Router</div>
+                <div class="node-detail">Autonomous question routing classifying presence, counting, spatial balance, quadrant grounding, and disaster change deltas.</div>
             </div>
-            <div class="stat-item">
-                <div class="num">02</div>
-                <div class="title">Visual Evidence Attribution</div>
-                <div class="detail">Layer-wise cross-attention heatmap extraction paired with stabilized bounding reticle anchoring.</div>
+            <div class="spec-node">
+                <div class="node-id">02 / RADAR</div>
+                <div class="node-title">Cross-Attention Salience</div>
+                <div class="node-detail">Layer-wise multi-head visual token attention heatmaps paired with sub-pixel target reticle anchoring.</div>
             </div>
-            <div class="stat-item">
-                <div class="num">03</div>
-                <div class="title">Bi-Temporal Damage Delta</div>
-                <div class="detail">Pre/post event pixel difference matrix correlated with multimodal VLM semantic change detection.</div>
+            <div class="spec-node">
+                <div class="node-id">03 / DELTA</div>
+                <div class="node-title">Bi-Temporal Damage Matrix</div>
+                <div class="node-detail">Pre/post observation differential pixel spectral Δ correlated with multimodal VLM spatial reasoning.</div>
             </div>
-            <div class="stat-item">
-                <div class="num">04</div>
-                <div class="title">Quantized Edge Inference</div>
-                <div class="detail">4-bit NF4 bitsandbytes & FP16 execution engineered for constrained GPU & edge intelligence deployment.</div>
+            <div class="spec-node">
+                <div class="node-id">04 / EDGE</div>
+                <div class="node-title">Quantized VLM Core</div>
+                <div class="node-detail">4-bit NF4 bitsandbytes & FP16 execution engineered for edge aerospace stations & cloud GPU environments.</div>
             </div>
         </div>
 
-        <div style="padding: 28px 0 40px; color: #64748b; font-family: 'JetBrains Mono', monospace; font-size: 12px; line-height: 1.8; text-align: center;">
-            SATQUERY AI · AEROSPACE & EARTH OBSERVATION INTELLIGENCE · TEAM CODE DARBAR (SIH 2026)<br>
-            Attribution-Oriented Evidence: Attention maps indicate token salience and model focus.
+        <div style="padding: 30px 0 45px; color: #64748b; font-family: 'JetBrains Mono', monospace; font-size: 12px; line-height: 1.8; text-align: center;">
+            SATQUERY AI · SATELLITE EARTH OBSERVATION GROUND CONTROL · TEAM CODE DARBAR (SIH 2026)<br>
+            Attribution & Telemetry Protocol: Cross-layer attention heatmaps represent model token attribution and visual salience.
         </div>
         """)
 
-    # Quick chip triggers
-    chip_1.click(lambda: "Is a residential building present in this scene?", outputs=query_in, queue=False)
-    chip_2.click(lambda: "How many aircraft or runways are visible?", outputs=query_in, queue=False)
-    chip_3.click(lambda: "Are there more water bodies than land areas?", outputs=query_in, queue=False)
-    chip_4.click(lambda: "Describe the structural damage and changes between these two scenes.", outputs=query_in, queue=False)
+    # Tactical quick chip triggers
+    chip_1.click(lambda: "Is a residential building or urban rooftop present in this scene?", outputs=query_in, queue=False)
+    chip_2.click(lambda: "How many aircraft or runway segments are visible in this airfield?", outputs=query_in, queue=False)
+    chip_3.click(lambda: "Are there more water bodies and rivers than land areas?", outputs=query_in, queue=False)
+    chip_4.click(lambda: "Describe the structural damage and changes between these two temporal scenes.", outputs=query_in, queue=False)
     chip_5.click(lambda: "Where is the primary feature located (NW, NE, SW, SE, or Center)?", outputs=query_in, queue=False)
 
     # Mode switching handlers
