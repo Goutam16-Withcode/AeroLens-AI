@@ -129,8 +129,15 @@ def _maybe_load_adapter(model):
     return model
 
 
+_cuda_supported_cache: Optional[bool] = None
+
+
 def _is_cuda_supported() -> bool:
+    global _cuda_supported_cache
+    if _cuda_supported_cache is not None:
+        return _cuda_supported_cache
     if not torch.cuda.is_available():
+        _cuda_supported_cache = False
         return False
     try:
         cap = torch.cuda.get_device_capability(0)
@@ -140,10 +147,13 @@ def _is_cuda_supported() -> bool:
         if major >= 10:
             req_arch = f"sm_{major}{minor}"
             if arch_list and req_arch not in arch_list:
-                print(f"[CUDA] Device capability {req_arch} ({torch.cuda.get_device_name(0)}) is not supported by installed PyTorch build.")
+                print(f"[CUDA] Device capability {req_arch} ({torch.cuda.get_device_name(0)}) requires CPU fallback mode.")
+                _cuda_supported_cache = False
                 return False
+        _cuda_supported_cache = True
         return True
     except Exception:
+        _cuda_supported_cache = False
         return False
 
 
@@ -151,6 +161,10 @@ def _load():
     global _model, _processor
     if _model is not None:
         return _model, _processor
+
+    # Optimize CPU compute threads
+    num_threads = max(1, os.cpu_count() or 4)
+    torch.set_num_threads(num_threads)
 
     use_cuda = _is_cuda_supported() and os.getenv("SATQUERY_FORCE_CPU", "0") != "1"
 
@@ -169,7 +183,7 @@ def _load():
             print(f"[quantization] Falling back to float16 ({e})")
             load_kwargs["torch_dtype"] = torch.float16
     else:
-        print("[device] Running in CPU mode (ensures zero-crash compatibility across all GPU architectures).")
+        print(f"[device] Initializing Qwen3-VL-4B on {num_threads} CPU threads (zero-crash mode).")
         load_kwargs = {
             "device_map": "cpu",
             "torch_dtype": torch.float32,
@@ -181,6 +195,7 @@ def _load():
     )
     _model = _maybe_load_adapter(_model)
     _processor = AutoProcessor.from_pretrained(MODEL_ID)
+    print(f"[model] Qwen3-VL-4B successfully loaded into memory and ready for queries.")
     return _model, _processor
 
 
@@ -1272,13 +1287,19 @@ def build_ui():
                 outputs=[answer, trace_md, ev1, ev2, ev3, ev4, report_file],
             )
 
+demo = None
+
+
+def get_demo():
+    global demo
+    if demo is None:
+        demo = build_ui()
     return demo
 
 
-demo = build_ui()
-
 if __name__ == "__main__":
-    demo.queue().launch(
+    d = get_demo()
+    d.queue().launch(
         server_name="0.0.0.0",
         server_port=int(os.getenv("PORT", "7860")),
         css=CSS,

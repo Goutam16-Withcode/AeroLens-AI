@@ -28,6 +28,8 @@ from pydantic import BaseModel
 # Import agent primitives from app or satquery
 import app as agent_module
 
+import threading
+
 app = FastAPI(
     title="SatQuery AI API",
     description="Orbital Earth Observation & Agentic Vision-Language Intelligence API",
@@ -44,6 +46,17 @@ app.add_middleware(
 )
 
 
+@app.on_event("startup")
+def preload_weights():
+    """Warm up Qwen3-VL-4B weights in the background so inference is instant."""
+    def _warmup():
+        try:
+            agent_module._load()
+        except Exception as e:
+            print(f"[warmup] Background weight loading encountered: {e}")
+    threading.Thread(target=_warmup, daemon=True).start()
+
+
 def pil_to_base64(img: Optional[Image.Image]) -> Optional[str]:
     if img is None:
         return None
@@ -57,14 +70,21 @@ def pil_to_base64(img: Optional[Image.Image]) -> Optional[str]:
 def get_status():
     """Return spacecraft and inference engine telemetry."""
     is_cuda = agent_module._is_cuda_supported() and os.getenv("SATQUERY_FORCE_CPU", "0") != "1"
+    gpu_name = "N/A"
+    try:
+        if torch.cuda.is_available():
+            gpu_name = torch.cuda.get_device_name(0)
+    except Exception:
+        pass
     return {
         "status": "online",
         "downlink_freq": "8.2 GHz (X-BAND)",
         "orbit": "LEO 540KM · SSO (98.2°)",
         "model_id": agent_module.MODEL_ID,
+        "model_ready": agent_module._model is not None,
         "device": "CUDA GPU" if is_cuda else "CPU Mode (Zero-Crash Fallback)",
         "adaptation": agent_module.adaptation_status(),
-        "gpu_name": torch.cuda.get_device_name(0) if torch.cuda.is_available() else "N/A",
+        "gpu_name": gpu_name,
         "timestamp": time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime()),
     }
 
