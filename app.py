@@ -1,9 +1,12 @@
-"""SatQuery AI — agentic remote-sensing vision-language assistant.
+"""SatQuery AI — Orbital Earth Observation & Satellite Geospatial Intelligence Ground Station.
 
-Implements: query classification -> input/task compatibility check ->
-tool selection -> tool execution -> evidence + confidence + execution
-trace. Five tools: single-image VQA, captioning, text-guided grounding,
-bitemporal change-VQA, and optical-SAR cross-modal fusion.
+Features:
+- Qwen3-VL-4B-Instruct inference with 4-bit NF4 quantisation & FP16 safe fallback.
+- Spacecraft Telemetry & Multi-Spectral VLM reasoning.
+- 5 Specialized Satellite Tools: Single VQA, Land-Cover Captioning, Text Grounding, Change-VQA, Optical-SAR Fusion.
+- Cross-Layer attention salience radar & tactical target reticle.
+- Bi-temporal disaster analysis with pixel difference heat mapping.
+- Ultra-Advanced Aerospace Ground Station HUD with Solar-Gold, Radar-Emerald, Optical-Cyan & Thermal-Ruby styling.
 """
 
 from __future__ import annotations
@@ -126,13 +129,33 @@ def _maybe_load_adapter(model):
     return model
 
 
+def _is_cuda_supported() -> bool:
+    if not torch.cuda.is_available():
+        return False
+    try:
+        cap = torch.cuda.get_device_capability(0)
+        arch_list = torch.cuda.get_arch_list() if hasattr(torch.cuda, "get_arch_list") else []
+        major, minor = cap
+        # Detect RTX 50-series (sm_120) with older PyTorch builds missing sm_120 kernels
+        if major >= 10:
+            req_arch = f"sm_{major}{minor}"
+            if arch_list and req_arch not in arch_list:
+                print(f"[CUDA] Device capability {req_arch} ({torch.cuda.get_device_name(0)}) is not supported by installed PyTorch build.")
+                return False
+        return True
+    except Exception:
+        return False
+
+
 def _load():
     global _model, _processor
     if _model is not None:
         return _model, _processor
 
-    load_kwargs: dict[str, Any] = {"device_map": "auto"}
-    if torch.cuda.is_available():
+    use_cuda = _is_cuda_supported() and os.getenv("SATQUERY_FORCE_CPU", "0") != "1"
+
+    if use_cuda:
+        load_kwargs: dict[str, Any] = {"device_map": "auto"}
         try:
             import bitsandbytes
             quant = BitsAndBytesConfig(
@@ -146,7 +169,12 @@ def _load():
             print(f"[quantization] Falling back to float16 ({e})")
             load_kwargs["torch_dtype"] = torch.float16
     else:
-        load_kwargs["torch_dtype"] = torch.float32
+        print("[device] Running in CPU mode (ensures zero-crash compatibility across all GPU architectures).")
+        load_kwargs = {
+            "device_map": "cpu",
+            "torch_dtype": torch.float32,
+            "low_cpu_mem_usage": True,
+        }
 
     _model = AutoModelForImageTextToText.from_pretrained(
         MODEL_ID, **load_kwargs
@@ -157,7 +185,10 @@ def _load():
 
 
 def adaptation_status() -> str:
-    return "BigEarthNet LoRA adapter (loaded)" if _adapter_loaded else "Base Model (RS adaptation not loaded)"
+    device_name = "GPU (CUDA)" if _is_cuda_supported() and os.getenv("SATQUERY_FORCE_CPU", "0") != "1" else "CPU Mode"
+    adapt = "BigEarthNet LoRA adapter (loaded)" if _adapter_loaded else "Base Model"
+    return f"{adapt} · {device_name}"
+
 
 
 # ============================================================
@@ -315,10 +346,7 @@ def _extract(model, processor, image: Image.Image, query: str, max_new_tokens: i
 
 def _extract_pair(model, processor, image_a: Image.Image, image_b: Image.Image,
                    query: str, max_new_tokens: int = 160) -> str:
-    """Two-image generation (change-VQA / optical-SAR fusion). No attention
-    extraction — the single-image attention math doesn't generalize
-    cleanly to two image blocks, so pair tasks use diff-based evidence
-    instead (see _diff_map / _diff_overlay / _diff_box)."""
+    """Two-image generation (change-VQA / optical-SAR fusion)."""
     device = next(model.parameters()).device
     messages = [{"role": "user", "content": [
         {"type": "image"}, {"type": "image"}, {"type": "text", "text": query},
@@ -476,7 +504,7 @@ class ExecutionTrace:
     timestamp: str
 
     def to_markdown(self) -> str:
-        conf_badge = "🟢 HIGH" if self.confidence >= 0.75 else "🟡 MODERATE" if self.confidence >= 0.5 else "🔴 ADVISORY"
+        conf_badge = "🟢 HIGH TELEMETRY LOCK" if self.confidence >= 0.75 else "🟡 NOMINAL LOCK" if self.confidence >= 0.5 else "🔴 ADVISORY LOCK"
         lines = [
             f"**🛰️ Task Selected:** `{self.task.upper()}`",
             f"**📡 Tools Invoked:** {', '.join(f'`{t}`' for t in self.tools_used)}",
@@ -686,14 +714,14 @@ def run_agent(path_a, modality_a, path_b, modality_b, query):
 # ============================================================
 # SATELLITE GROUND CONTROL UI & AESTHETICS
 # ============================================================
-def _make_star_field(count: int = 190) -> str:
+def _make_star_field(count: int = 210) -> str:
     rng = random.Random(STAR_SEED)
     stars = []
     for _ in range(count):
         x = rng.uniform(0, 100); y = rng.uniform(0, 100)
-        size = rng.uniform(0.8, 2.2)
-        opacity = rng.uniform(0.2, 0.85)
-        dur = rng.uniform(3, 8)
+        size = rng.uniform(0.8, 2.4)
+        opacity = rng.uniform(0.2, 0.9)
+        dur = rng.uniform(2.5, 7.5)
         stars.append(
             f'<span class="satq-star" style="--x:{x:.2f}%;--y:{y:.2f}%;--size:{size:.2f}px;--opacity:{opacity:.2f};--dur:{dur:.1f}s"></span>'
         )
@@ -708,16 +736,16 @@ CSS = r"""
 :root {
   --space-void: #02050e;
   --hull-bg: #070e1c;
-  --hull-card: rgba(11, 20, 38, 0.85);
+  --hull-card: rgba(11, 20, 38, 0.88);
   --sat-gold: #f59e0b;
   --sat-gold-bright: #fbbf24;
-  --sat-gold-glow: rgba(245, 158, 11, 0.35);
+  --sat-gold-glow: rgba(245, 158, 11, 0.4);
   --radar-emerald: #00ff88;
   --optical-cyan: #00f5ff;
-  --optical-cyan-glow: rgba(0, 245, 255, 0.38);
+  --optical-cyan-glow: rgba(0, 245, 255, 0.4);
   --thermal-ruby: #ff2a6d;
-  --border-gold: rgba(245, 158, 11, 0.45);
-  --border-cyan: rgba(0, 245, 255, 0.35);
+  --border-gold: rgba(245, 158, 11, 0.5);
+  --border-cyan: rgba(0, 245, 255, 0.38);
   --border-subtle: rgba(255, 255, 255, 0.08);
   --text-pure: #ffffff;
   --text-muted: #8da4be;
@@ -747,9 +775,9 @@ footer, .footer, .built-with, .show-api {
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  background: radial-gradient(circle at 50% 0%, rgba(0, 245, 255, 0.12) 0%, transparent 55%),
-              radial-gradient(circle at 10% 30%, rgba(245, 158, 11, 0.08) 0%, transparent 40%),
-              radial-gradient(circle at 90% 80%, rgba(255, 42, 109, 0.08) 0%, transparent 45%),
+  background: radial-gradient(circle at 50% 0%, rgba(0, 245, 255, 0.14) 0%, transparent 60%),
+              radial-gradient(circle at 10% 30%, rgba(245, 158, 11, 0.09) 0%, transparent 40%),
+              radial-gradient(circle at 90% 80%, rgba(255, 42, 109, 0.09) 0%, transparent 45%),
               linear-gradient(180deg, #02050e 0%, #050c18 50%, #02050e 100%);
 }
 
@@ -772,9 +800,9 @@ footer, .footer, .built-with, .show-api {
 }
 
 #mission-page {
-  max-width: 1360px;
+  max-width: 1380px;
   margin: 0 auto;
-  padding: 18px 22px 60px;
+  padding: 18px 24px 60px;
   position: relative;
   z-index: 1;
 }
@@ -786,7 +814,7 @@ footer, .footer, .built-with, .show-api {
   border: 1px solid var(--border-cyan);
   border-top: 3px solid var(--sat-gold);
   border-radius: 16px;
-  padding: 22px 30px;
+  padding: 24px 32px;
   margin-bottom: 22px;
   box-shadow: 0 16px 48px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.1);
   display: flex;
@@ -803,16 +831,16 @@ footer, .footer, .built-with, .show-api {
 }
 
 .sat-dish-beacon {
-  width: 56px;
-  height: 56px;
+  width: 58px;
+  height: 58px;
   background: radial-gradient(circle at 30% 30%, #fbbf24 0%, #d97706 60%, #78350f 100%);
   border: 2px solid #fef08a;
   border-radius: 14px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 28px;
-  box-shadow: 0 0 24px var(--sat-gold-glow);
+  font-size: 30px;
+  box-shadow: 0 0 26px var(--sat-gold-glow);
   position: relative;
 }
 
@@ -832,7 +860,7 @@ footer, .footer, .built-with, .show-api {
 
 .sat-title-text h1 {
   font-family: var(--font-hud);
-  font-size: 28px;
+  font-size: 30px;
   font-weight: 800;
   letter-spacing: 0.06em;
   margin: 0;
@@ -850,7 +878,7 @@ footer, .footer, .built-with, .show-api {
 
 .sat-subkicker {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 11.5px;
   color: var(--sat-gold-bright);
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -869,8 +897,8 @@ footer, .footer, .built-with, .show-api {
   font-family: var(--font-mono);
   font-size: 11.5px;
   font-weight: 600;
-  padding: 6px 14px;
-  background: rgba(7, 18, 36, 0.85);
+  padding: 7px 15px;
+  background: rgba(7, 18, 36, 0.88);
   border: 1px solid var(--border-cyan);
   border-radius: 8px;
   color: #e2e8f0;
@@ -911,14 +939,14 @@ footer, .footer, .built-with, .show-api {
   border: 1px solid var(--border-subtle);
   border-radius: 16px;
   backdrop-filter: blur(20px);
-  padding: 24px !important;
+  padding: 26px !important;
   box-shadow: 0 30px 90px rgba(0, 0, 0, 0.75);
   margin-bottom: 24px;
 }
 
 .hud-panel-title {
   font-family: var(--font-hud);
-  font-size: 13px;
+  font-size: 13.5px;
   font-weight: 700;
   color: var(--optical-cyan);
   letter-spacing: 0.14em;
@@ -994,7 +1022,7 @@ footer, .footer, .built-with, .show-api {
   background: linear-gradient(135deg, #f59e0b 0%, #d97706 60%, #b45309 100%) !important;
   color: #030712 !important;
   font-family: var(--font-hud) !important;
-  font-size: 14.5px !important;
+  font-size: 15px !important;
   font-weight: 800 !important;
   letter-spacing: 0.1em !important;
   border: 1px solid #fde68a !important;
@@ -1041,7 +1069,7 @@ footer, .footer, .built-with, .show-api {
   background: var(--hull-bg);
   border: 1px solid var(--border-subtle);
   border-radius: 16px;
-  padding: 24px !important;
+  padding: 26px !important;
   margin-bottom: 24px;
 }
 
@@ -1105,7 +1133,6 @@ JS = r"""
 # BUILD UI
 # ============================================================
 def build_ui():
-    # Build robust examples
     example_options = []
     sample_candidates = [
         ("examples/scene_535.png", "Auto", None, "Auto", "Is a residential building present in this scene?"),

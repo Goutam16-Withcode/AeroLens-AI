@@ -1,0 +1,530 @@
+@import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+:root {
+  --space-void: #02050e;
+  --hull-bg: #070e1c;
+  --hull-card: rgba(11, 20, 38, 0.85);
+  --sat-gold: #f59e0b;
+  --sat-gold-bright: #fbbf24;
+  --sat-gold-glow: rgba(245, 158, 11, 0.4);
+  --radar-emerald: #00ff88;
+  --radar-emerald-glow: rgba(0, 255, 136, 0.35);
+  --optical-cyan: #00f5ff;
+  --optical-cyan-glow: rgba(0, 245, 255, 0.4);
+  --thermal-ruby: #ff2a6d;
+  --thermal-ruby-glow: rgba(255, 42, 109, 0.4);
+  --border-gold: rgba(245, 158, 11, 0.45);
+  --border-cyan: rgba(0, 245, 255, 0.35);
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --text-pure: #ffffff;
+  --text-muted: #8da4be;
+  --font-hud: 'Chakra Petch', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --font-body: 'Plus Jakarta Sans', sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  background-color: var(--space-void);
+  color: var(--text-pure);
+  font-family: var(--font-body);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* Background Cosmic Nebula & Stars */
+.space-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(circle at 50% 0%, rgba(0, 245, 255, 0.12) 0%, transparent 60%),
+              radial-gradient(circle at 10% 30%, rgba(245, 158, 11, 0.08) 0%, transparent 45%),
+              radial-gradient(circle at 90% 80%, rgba(255, 42, 109, 0.08) 0%, transparent 50%),
+              linear-gradient(180deg, #02050e 0%, #050c18 50%, #02050e 100%);
+}
+
+.cosmic-star {
+  position: absolute;
+  background: #ffffff;
+  border-radius: 50%;
+  box-shadow: 0 0 8px rgba(0, 245, 255, 0.8);
+  animation: starPulse var(--dur, 4s) ease-in-out infinite alternate;
+}
+
+@keyframes starPulse {
+  0% { opacity: calc(var(--opacity) * 0.3); transform: scale(0.8); }
+  100% { opacity: var(--opacity); transform: scale(1.4); }
+}
+
+/* Container Layout */
+.ground-station-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 24px 28px 80px;
+  position: relative;
+  z-index: 1;
+}
+
+/* SATELLITE COMMAND HEADER */
+.sat-header {
+  background: linear-gradient(135deg, rgba(12, 22, 42, 0.95) 0%, rgba(7, 14, 28, 0.92) 100%);
+  backdrop-filter: blur(24px);
+  border: 1px solid var(--border-cyan);
+  border-top: 3px solid var(--sat-gold);
+  border-radius: 16px;
+  padding: 22px 30px;
+  margin-bottom: 24px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.75), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.sat-brand-wrap {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.sat-dish-beacon {
+  width: 58px;
+  height: 58px;
+  background: radial-gradient(circle at 30% 30%, #fbbf24 0%, #d97706 60%, #78350f 100%);
+  border: 2px solid #fef08a;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 30px;
+  box-shadow: 0 0 26px var(--sat-gold-glow);
+  position: relative;
+}
+
+.sat-dish-beacon::after {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border: 1.5px dashed var(--optical-cyan);
+  border-radius: 18px;
+  animation: radarRotate 12s linear infinite;
+}
+
+@keyframes radarRotate {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.sat-title-text h1 {
+  font-family: var(--font-hud);
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  margin: 0;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sat-title-text h1 span {
+  background: linear-gradient(135deg, #00f5ff 0%, #38bdf8 50%, #fbbf24 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.sat-subkicker {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--sat-gold-bright);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  margin-top: 4px;
+}
+
+/* LIVE ORBIT TELEMETRY PILLS */
+.orbit-telemetry-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.telemetry-chip {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 7px 15px;
+  background: rgba(7, 18, 36, 0.88);
+  border: 1px solid var(--border-cyan);
+  border-radius: 8px;
+  color: #e2e8f0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.telemetry-chip.emerald {
+  border-color: rgba(0, 255, 136, 0.5);
+  background: rgba(0, 255, 136, 0.08);
+  color: #a7f3d0;
+}
+
+.telemetry-chip.gold {
+  border-color: rgba(245, 158, 11, 0.5);
+  background: rgba(245, 158, 11, 0.08);
+  color: #fde68a;
+}
+
+.pulse-led {
+  width: 8px;
+  height: 8px;
+  background: var(--radar-emerald);
+  border-radius: 50%;
+  box-shadow: 0 0 10px var(--radar-emerald);
+  animation: ledFlash 1.6s ease-in-out infinite;
+}
+
+@keyframes ledFlash {
+  0%, 100% { opacity: 0.5; transform: scale(0.9); }
+  50% { opacity: 1; transform: scale(1.25); }
+}
+
+/* SATELLITE HUD DECK CARDS */
+.hud-deck-card {
+  background: var(--hull-bg);
+  border: 1px solid var(--border-subtle);
+  border-radius: 16px;
+  backdrop-filter: blur(20px);
+  padding: 24px;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.7);
+  margin-bottom: 24px;
+  position: relative;
+}
+
+.hud-panel-title {
+  font-family: var(--font-hud);
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--optical-cyan);
+  letter-spacing: 0.14em;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-transform: uppercase;
+}
+
+.hud-panel-title span {
+  color: var(--sat-gold-bright);
+}
+
+/* DUAL INGESTION GRID */
+.ingestion-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.upload-port {
+  background: rgba(4, 9, 20, 0.85);
+  border: 1.5px dashed rgba(0, 245, 255, 0.3);
+  border-radius: 12px;
+  padding: 16px;
+  min-height: 240px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  overflow: hidden;
+}
+
+.upload-port:hover {
+  border-color: var(--optical-cyan);
+  background: rgba(0, 245, 255, 0.04);
+  box-shadow: 0 0 20px rgba(0, 245, 255, 0.15);
+}
+
+.upload-port.active-port {
+  border-style: solid;
+  border-color: var(--border-cyan);
+  background: #020610;
+}
+
+.upload-preview-img {
+  width: 100%;
+  height: 220px;
+  object-fit: cover;
+  border-radius: 8px;
+}
+
+.modality-selector {
+  margin-top: 10px;
+  width: 100%;
+  padding: 8px 12px;
+  background: rgba(8, 16, 32, 0.9);
+  border: 1px solid var(--border-cyan);
+  border-radius: 6px;
+  color: var(--text-pure);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+/* QUICK COMMAND CHIPS */
+.query-chips-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0 16px;
+}
+
+.sat-chip-btn {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 7px 14px;
+  background: rgba(0, 245, 255, 0.06);
+  border: 1px solid rgba(0, 245, 255, 0.25);
+  border-radius: 6px;
+  color: #e2e8f0;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.sat-chip-btn:hover {
+  background: rgba(0, 245, 255, 0.2);
+  border-color: var(--optical-cyan);
+  color: #ffffff;
+  box-shadow: 0 0 14px rgba(0, 245, 255, 0.35);
+  transform: translateY(-1px);
+}
+
+/* TARGET UPLINK INPUT */
+.query-textarea {
+  width: 100%;
+  background: rgba(4, 9, 20, 0.9);
+  border: 1px solid var(--border-gold);
+  border-radius: 10px;
+  color: #ffffff;
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.5;
+  padding: 14px 18px;
+  resize: vertical;
+  min-height: 90px;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.query-textarea:focus {
+  border-color: var(--sat-gold-bright);
+  box-shadow: 0 0 20px var(--sat-gold-glow);
+}
+
+/* TRANSMIT BUTTON */
+.transmit-btn {
+  width: 100%;
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 60%, #b45309 100%);
+  color: #020612;
+  font-family: var(--font-hud);
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  border: 1px solid #fde68a;
+  border-radius: 8px;
+  padding: 14px 28px;
+  box-shadow: 0 6px 24px var(--sat-gold-glow);
+  cursor: pointer;
+  transition: all 0.25s ease;
+  text-transform: uppercase;
+  margin-top: 14px;
+}
+
+.transmit-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 32px rgba(245, 158, 11, 0.6);
+}
+
+.transmit-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* SYNTHESIS & TRACE BOXES */
+.synthesis-box {
+  background: rgba(4, 8, 16, 0.9);
+  border: 1px solid rgba(0, 245, 255, 0.35);
+  border-left: 4px solid var(--optical-cyan);
+  border-radius: 10px;
+  color: #ffffff;
+  font-size: 15px;
+  line-height: 1.6;
+  padding: 16px 20px;
+  margin-top: 14px;
+  min-height: 100px;
+}
+
+.trace-terminal {
+  background: rgba(3, 7, 15, 0.95);
+  border: 1px solid var(--border-cyan);
+  border-radius: 10px;
+  padding: 16px 20px;
+  color: #a7f3d0;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 1.7;
+  margin-top: 14px;
+  white-space: pre-wrap;
+}
+
+/* EVIDENCE 4-SLOT GRID */
+.evidence-slots-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+
+.evidence-slot-card {
+  background: #030712;
+  border: 1px solid rgba(0, 245, 255, 0.25);
+  border-radius: 10px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.slot-header {
+  padding: 10px 14px;
+  background: rgba(7, 16, 32, 0.9);
+  font-family: var(--font-hud);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--optical-cyan);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.slot-img-wrap {
+  height: 240px;
+  background: #02050e;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.slot-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* MISSION ARCHIVE CARDS */
+.mission-archive-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.mission-card {
+  background: rgba(10, 18, 34, 0.75);
+  border: 1px solid rgba(0, 245, 255, 0.2);
+  border-radius: 12px;
+  padding: 16px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+.mission-card:hover {
+  border-color: var(--optical-cyan);
+  background: rgba(0, 245, 255, 0.08);
+  box-shadow: 0 8px 24px rgba(0, 245, 255, 0.2);
+  transform: translateY(-2px);
+}
+
+.mission-tag {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--sat-gold-bright);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.mission-title {
+  font-family: var(--font-hud);
+  font-size: 14px;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 6px 0 4px;
+}
+
+.mission-query-preview {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+/* SPECIFICATIONS GRID */
+.specs-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  background: rgba(8, 15, 30, 0.7);
+  margin-top: 36px;
+  overflow: hidden;
+}
+
+.spec-node {
+  padding: 22px 26px;
+  border-right: 1px solid var(--border-subtle);
+}
+
+.spec-node:last-child {
+  border-right: 0;
+}
+
+.spec-node .node-id {
+  font-family: var(--font-hud);
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--sat-gold-bright);
+  margin-bottom: 6px;
+}
+
+.spec-node .node-title {
+  font-family: var(--font-hud);
+  font-size: 14px;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: 0.06em;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+}
+
+.spec-node .node-detail {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+@media (max-width: 1024px) {
+  .evidence-slots-grid { grid-template-columns: 1fr 1fr; }
+  .specs-grid { grid-template-columns: 1fr 1fr; }
+  .ingestion-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 768px) {
+  .evidence-slots-grid { grid-template-columns: 1fr; }
+  .specs-grid { grid-template-columns: 1fr; }
+  .ground-station-container { padding: 14px; }
+}

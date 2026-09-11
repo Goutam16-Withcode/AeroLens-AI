@@ -1,0 +1,229 @@
+"""SatQuery AI — FastAPI Backend Server for Next.js / React Frontend.
+
+Exposes REST APIs for:
+- 5-tool Agentic VLM inference (VQA, Captioning, Grounding, Change-VQA, Optical-SAR Fusion)
+- System telemetry and BigEarthNet LoRA domain adaptation status
+- Benchmark mission example payloads
+"""
+
+from __future__ import annotations
+
+import os
+import io
+import json
+import base64
+import tempfile
+import time
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+import numpy as np
+import torch
+from PIL import Image
+from fastapi import FastAPI, File, Form, UploadFile, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse, FileResponse
+from pydantic import BaseModel
+
+# Import agent primitives from app or satquery
+import app as agent_module
+
+app = FastAPI(
+    title="SatQuery AI API",
+    description="Orbital Earth Observation & Agentic Vision-Language Intelligence API",
+    version="2.0.0",
+)
+
+# Enable CORS for Next.js development and production
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+def pil_to_base64(img: Optional[Image.Image]) -> Optional[str]:
+    if img is None:
+        return None
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    b64 = base64.b64encode(buf.getvalue()).decode("ascii")
+    return f"data:image/png;base64,{b64}"
+
+
+@app.get("/api/status")
+def get_status():
+    """Return spacecraft and inference engine telemetry."""
+    is_cuda = agent_module._is_cuda_supported() and os.getenv("SATQUERY_FORCE_CPU", "0") != "1"
+    return {
+        "status": "online",
+        "downlink_freq": "8.2 GHz (X-BAND)",
+        "orbit": "LEO 540KM · SSO (98.2°)",
+        "model_id": agent_module.MODEL_ID,
+        "device": "CUDA GPU" if is_cuda else "CPU Mode (Zero-Crash Fallback)",
+        "adaptation": agent_module.adaptation_status(),
+        "gpu_name": torch.cuda.get_device_name(0) if torch.cuda.is_available() else "N/A",
+        "timestamp": time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime()),
+    }
+
+
+@app.get("/api/examples")
+def get_examples():
+    """Return curated benchmark missions for single-scene, change-VQA, and optical-SAR fusion."""
+    examples = []
+    
+    # Check sample files
+    candidates = [
+        {
+            "id": "vrsbench_airfield",
+            "title": "Airfield & Infrastructure Grounding",
+            "category": "Visual Grounding",
+            "mission_tag": "PASS: EO-742",
+            "image_a": "data/samples/vrsbench/vrsbench_sample_01.png",
+            "modality_a": "Optical",
+            "image_b": None,
+            "modality_b": "Auto",
+            "query": "Locate and highlight all parked airplanes on the apron.",
+        },
+        {
+            "id": "rsvqa_landuse",
+            "title": "Urban Land-Cover & Buildings",
+            "category": "VQA & Counting",
+            "mission_tag": "PASS: EO-819",
+            "image_a": "data/samples/rsvqa/rsvqa_sample_01.png",
+            "modality_a": "Optical",
+            "image_b": None,
+            "modality_b": "Auto",
+            "query": "Is a residential building present in this scene?",
+        },
+        {
+            "id": "cdvqa_tsunami",
+            "title": "Palu Tsunami Coastal Inundation",
+            "category": "Bi-Temporal Disaster",
+            "mission_tag": "DISASTER CHARTER #581",
+            "image_a": "disaster_examples/tsunami_before.tiff",
+            "modality_a": "Optical",
+            "image_b": "disaster_examples/tsunami_after.tiff",
+            "modality_b": "Optical",
+            "query": "Describe the coastal inundation and structural damage caused by the tsunami.",
+        },
+        {
+            "id": "cdvqa_landslide",
+            "title": "Mountain Slope Landslide",
+            "category": "Bi-Temporal Disaster",
+            "mission_tag": "DISASTER CHARTER #614",
+            "image_a": "disaster_examples/landslide_before.tiff",
+            "modality_a": "Optical",
+            "image_b": "disaster_examples/landslide_after.tiff",
+            "modality_b": "Optical",
+            "query": "Describe what changed on the mountain slope between these two temporal images.",
+        },
+        {
+            "id": "bigearthnet_fusion",
+            "title": "Sentinel-2 Optical + Sentinel-1 SAR Multi-Sensor Fusion",
+            "category": "Optical-SAR Fusion",
+            "mission_tag": "BEN-DUAL-SENSOR",
+            "image_a": "data/samples/bigearthnet/sentinel2_optical.png",
+            "modality_a": "Optical",
+            "image_b": "data/samples/bigearthnet/sentinel1_sar.png",
+            "modality_b": "SAR",
+            "query": "Use both the optical and SAR images together to identify water boundaries beneath cloud cover.",
+        },
+    ]
+
+    for item in candidates:
+        if os.path.exists(item["image_a"]):
+            # Add thumbnail base64
+            try:
+                img_a = Image.open(item["image_a"]).convert("RGB")
+                img_a.thumbnail((320, 320))
+                item["image_a_preview"] = pil_to_base64(img_a)
+            except Exception:
+                item["image_a_preview"] = None
+            
+            if item["image_b"] and os.path.exists(item["image_b"]):
+                try:
+                    img_b = Image.open(item["image_b"]).convert("RGB")
+                    img_b.thumbnail((320, 320))
+                    item["image_b_preview"] = pil_to_base64(img_b)
+                except Exception:
+                    item["image_b_preview"] = None
+            else:
+                item["image_b_preview"] = None
+                
+            examples.append(item)
+
+    return {"examples": examples}
+
+
+@app.post("/api/analyze")
+async def analyze(
+    query: str = Form(...),
+    modality_a: str = Form("Auto"),
+    modality_b: str = Form("Auto"),
+    image_a: UploadFile = File(...),
+    image_b: Optional[UploadFile] = File(None),
+):
+    """Execute the 5-tool Agentic VLM workflow and return evidence + execution trace."""
+    # Save temporary files
+    suffix_a = Path(image_a.filename or "image_a.png").suffix or ".png"
+    temp_a = tempfile.NamedTemporaryFile(delete=False, suffix=suffix_a)
+    temp_a.write(await image_a.read())
+    temp_a.close()
+    path_a = temp_a.name
+
+    path_b = None
+    if image_b is not None:
+        suffix_b = Path(image_b.filename or "image_b.png").suffix or ".png"
+        temp_b = tempfile.NamedTemporaryFile(delete=False, suffix=suffix_b)
+        temp_b.write(await image_b.read())
+        temp_b.close()
+        path_b = temp_b.name
+
+    try:
+        # Run agent
+        result = agent_module._agent.run(path_a, path_b, modality_a, modality_b, query)
+
+        if result.error:
+            return JSONResponse(
+                status_code=400,
+                content={"error": result.error, "trace": None},
+            )
+
+        ev = result.evidence
+        evidence_payload = {
+            "slot1_original": pil_to_base64(ev.get("original") or ev.get("before") or ev.get("optical")),
+            "slot2_attention_or_diff": pil_to_base64(ev.get("attention") or ev.get("diff_heatmap") or ev.get("disagreement_map")),
+            "slot3_reticle_or_sar": pil_to_base64(ev.get("box") or ev.get("diff_box") or ev.get("sar")),
+            "slot4_after": pil_to_base64(ev.get("after")),
+        }
+
+        trace_data = result.trace.to_dict() if result.trace else None
+
+        return {
+            "answer": result.answer,
+            "evidence": evidence_payload,
+            "trace": trace_data,
+            "trace_markdown": result.trace.to_markdown() if result.trace else "",
+        }
+    finally:
+        # Clean up temporary files
+        try:
+            if os.path.exists(path_a):
+                os.remove(path_a)
+            if path_b and os.path.exists(path_b):
+                os.remove(path_b)
+        except Exception:
+            pass
+
+
+@app.get("/api/health")
+def health():
+    return {"status": "ok"}
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
