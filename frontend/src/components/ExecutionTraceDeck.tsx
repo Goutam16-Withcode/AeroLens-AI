@@ -79,28 +79,28 @@ export const ExecutionTraceDeck: React.FC<ExecutionTraceDeckProps> = ({ trace, f
               marginBottom: '12px',
             }}
           >
-            <div style={{ background: '#0e0e12', border: '1px solid var(--border-subtle)', padding: '8px 10px', borderRadius: '6px' }}>
+            <div style={{ background: '#f8f4ec', border: '1px solid var(--border-subtle)', padding: '8px 10px', borderRadius: '6px' }}>
               <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', color: 'var(--text-muted)' }}>ROUTED TASK</div>
               <div style={{ fontFamily: 'var(--font-hud)', fontSize: '12px', color: 'var(--accent-amber)', fontWeight: 600, marginTop: '2px' }}>
                 {trace.task.toUpperCase()}
               </div>
             </div>
 
-            <div style={{ background: '#0e0e12', border: '1px solid var(--border-subtle)', padding: '8px 10px', borderRadius: '6px' }}>
+            <div style={{ background: '#f8f4ec', border: '1px solid var(--border-subtle)', padding: '8px 10px', borderRadius: '6px' }}>
               <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', color: 'var(--text-muted)' }}>PIPELINE</div>
               <div style={{ fontFamily: 'var(--font-hud)', fontSize: '12px', color: 'var(--accent-emerald)', fontWeight: 600, marginTop: '2px' }}>
                 {trace.tools_used.join(' → ')}
               </div>
             </div>
 
-            <div style={{ background: '#0e0e12', border: '1px solid var(--border-subtle)', padding: '8px 10px', borderRadius: '6px' }}>
+            <div style={{ background: '#f8f4ec', border: '1px solid var(--border-subtle)', padding: '8px 10px', borderRadius: '6px' }}>
               <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', color: 'var(--text-muted)' }}>LATENCY</div>
               <div style={{ fontFamily: 'var(--font-hud)', fontSize: '12px', color: 'var(--accent-amber-bright)', fontWeight: 600, marginTop: '2px' }}>
                 {trace.elapsed_seconds.toFixed(2)}s
               </div>
             </div>
 
-            <div style={{ background: '#0e0e12', border: '1px solid var(--border-subtle)', padding: '8px 10px', borderRadius: '6px' }}>
+            <div style={{ background: '#f8f4ec', border: '1px solid var(--border-subtle)', padding: '8px 10px', borderRadius: '6px' }}>
               <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', color: 'var(--text-muted)' }}>ADAPTATION</div>
               <div style={{ fontFamily: 'var(--font-hud)', fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 600, marginTop: '2px' }}>
                 {trace.rs_adaptation || 'Standard'}

@@ -239,6 +239,26 @@ async def analyze(
             pass
 
 
+@app.post("/api/spectral-indices")
+async def calculate_spectral_indices(
+    index_type: str = Form("ndvi"),
+    image: UploadFile = File(...),
+):
+    """Compute scientific remote sensing spectral indices (NDVI, NDWI, NDBI, False-Color CIR)."""
+    from satquery.core.spectral_indices import compute_spectral_index
+    
+    content = await image.read()
+    pil_img = Image.open(io.BytesIO(content)).convert("RGB")
+    
+    result_img, stats = compute_spectral_index(pil_img, index_type=index_type)
+    
+    return {
+        "index_type": index_type,
+        "processed_image": pil_to_base64(result_img),
+        "statistics": stats,
+    }
+
+
 @app.get("/api/health")
 def health():
     return {"status": "ok"}

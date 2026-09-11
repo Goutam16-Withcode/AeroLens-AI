@@ -8,6 +8,12 @@ import { EvidenceVisualizer } from '../components/EvidenceVisualizer';
 import { VlmSynthesisTerminal } from '../components/VlmSynthesisTerminal';
 import { ExecutionTraceDeck } from '../components/ExecutionTraceDeck';
 import { MissionArchiveGallery } from '../components/MissionArchiveGallery';
+import { SpectralIndicesDeck } from '../components/SpectralIndicesDeck';
+import { BitemporalSwipeSlider } from '../components/BitemporalSwipeSlider';
+import { GeospatialTelemetryHUD } from '../components/GeospatialTelemetryHUD';
+import { GeospatialLoupeEnhancer } from '../components/GeospatialLoupeEnhancer';
+import { SatelliteOrbitRadar } from '../components/SatelliteOrbitRadar';
+import { MissionBriefingModal } from '../components/MissionBriefingModal';
 import { AnalysisResponse, BenchmarkMission } from '../types/satquery';
 
 function dataURLtoFile(dataurl: string, filename: string): File {
@@ -38,6 +44,12 @@ export default function GroundStationPage() {
   const [response, setResponse] = useState<AnalysisResponse | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  // Active View Tab on Right Column
+  const [activeTab, setActiveTab] = useState<'matrix' | 'indices' | 'swipe' | 'hud' | 'loupe' | 'radar'>('matrix');
+
+  // Mission Briefing Modal
+  const [isBriefingOpen, setIsBriefingOpen] = useState<boolean>(false);
+
   const handleSelectMission = (mission: BenchmarkMission) => {
     setQuery(mission.query);
     setModalityA(mission.modality_a || 'Auto');
@@ -60,7 +72,7 @@ export default function GroundStationPage() {
   };
 
   const handleTransmit = async () => {
-    if (!fileA) {
+    if (!fileA && !previewA) {
       setErrorMessage('Please ingest primary Sensor A swath or select a verified benchmark mission preset below.');
       return;
     }
@@ -76,9 +88,17 @@ export default function GroundStationPage() {
     formData.append('query', query);
     formData.append('modality_a', modalityA);
     formData.append('modality_b', modalityB);
-    formData.append('image_a', fileA);
+    
+    if (fileA) {
+      formData.append('image_a', fileA);
+    } else if (previewA) {
+      formData.append('image_a', dataURLtoFile(previewA, 'sensor_a.png'));
+    }
+
     if (fileB) {
       formData.append('image_b', fileB);
+    } else if (previewB) {
+      formData.append('image_b', dataURLtoFile(previewB, 'sensor_b.png'));
     }
 
     try {
@@ -111,13 +131,49 @@ export default function GroundStationPage() {
         {/* Top Navbar */}
         <OrbitalHeader />
 
+        {/* Action Bar: Briefing Generator */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>
+            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--accent-amber)', display: 'inline-block' }} />
+            <span>OPERATIONAL COCKPIT // 6 ADVANCED REMOTE SENSING DEVIATION TOOLS</span>
+          </div>
+
+          {response && (
+            <button
+              onClick={() => setIsBriefingOpen(true)}
+              style={{
+                padding: '6px 14px',
+                background: 'var(--accent-amber-subtle)',
+                border: '1px solid var(--accent-amber-border)',
+                borderRadius: '6px',
+                color: 'var(--accent-amber)',
+                fontFamily: 'var(--font-mono)',
+                fontSize: '11px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+              }}
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+                <line x1="16" y1="13" x2="8" y2="13" />
+                <line x1="16" y1="17" x2="8" y2="17" />
+              </svg>
+              <span>GENERATE MISSION INTELLIGENCE BRIEFING (PDF)</span>
+            </button>
+          )}
+        </div>
+
         {/* Error Alert */}
         {errorMessage && (
           <div
             style={{
-              background: 'rgba(244, 63, 94, 0.1)',
-              border: '1px solid rgba(244, 63, 94, 0.25)',
-              color: '#fecdd3',
+              background: '#fef2f2',
+              border: '1px solid #fecaca',
+              color: '#991b1b',
               borderRadius: '8px',
               padding: '10px 14px',
               marginBottom: '16px',
@@ -129,7 +185,7 @@ export default function GroundStationPage() {
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f43f5e" strokeWidth="2">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="2">
                 <circle cx="12" cy="12" r="10" />
                 <line x1="12" y1="8" x2="12" y2="12" />
                 <line x1="12" y1="16" x2="12.01" y2="16" />
@@ -141,7 +197,7 @@ export default function GroundStationPage() {
               style={{
                 background: 'transparent',
                 border: 'none',
-                color: '#f43f5e',
+                color: '#dc2626',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
@@ -180,21 +236,156 @@ export default function GroundStationPage() {
               onTransmit={handleTransmit}
               isLoading={isLoading}
             />
+
+            <SatelliteOrbitRadar />
           </div>
 
-          {/* Right Column: Multi-Spectral Matrix & Intelligence Terminal */}
+          {/* Right Column: Multi-Feature Telemetry Hub */}
           <div>
-            <EvidenceVisualizer
-              evidence={response?.evidence || null}
-              isLoading={isLoading}
-            />
+            {/* View Tab Switcher */}
+            <div
+              style={{
+                display: 'flex',
+                gap: '6px',
+                marginBottom: '12px',
+                borderBottom: '1px solid var(--border-subtle)',
+                paddingBottom: '8px',
+                flexWrap: 'wrap',
+              }}
+            >
+              <button
+                onClick={() => setActiveTab('matrix')}
+                style={{
+                  padding: '6px 12px',
+                  background: activeTab === 'matrix' ? 'var(--accent-amber-subtle)' : '#f5f0e8',
+                  border: `1px solid ${activeTab === 'matrix' ? 'var(--accent-amber)' : 'var(--border-subtle)'}`,
+                  borderRadius: '6px',
+                  color: activeTab === 'matrix' ? 'var(--accent-amber)' : 'var(--text-secondary)',
+                  fontFamily: 'var(--font-hud)',
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  transition: 'all 0.18s ease',
+                }}
+              >
+                [01] EVIDENCE MATRIX
+              </button>
 
+              <button
+                onClick={() => setActiveTab('indices')}
+                style={{
+                  padding: '6px 12px',
+                  background: activeTab === 'indices' ? 'var(--accent-amber-subtle)' : '#f5f0e8',
+                  border: `1px solid ${activeTab === 'indices' ? 'var(--accent-amber)' : 'var(--border-subtle)'}`,
+                  borderRadius: '6px',
+                  color: activeTab === 'indices' ? 'var(--accent-amber)' : 'var(--text-secondary)',
+                  fontFamily: 'var(--font-hud)',
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  transition: 'all 0.18s ease',
+                }}
+              >
+                [02] BAND MATH (NDVI/NDWI)
+              </button>
+
+              <button
+                onClick={() => setActiveTab('swipe')}
+                style={{
+                  padding: '6px 12px',
+                  background: activeTab === 'swipe' ? 'var(--accent-amber-subtle)' : '#f5f0e8',
+                  border: `1px solid ${activeTab === 'swipe' ? 'var(--accent-amber)' : 'var(--border-subtle)'}`,
+                  borderRadius: '6px',
+                  color: activeTab === 'swipe' ? 'var(--accent-amber)' : 'var(--text-secondary)',
+                  fontFamily: 'var(--font-hud)',
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  transition: 'all 0.18s ease',
+                }}
+              >
+                [03] COMPARISON SLIDER
+              </button>
+
+              <button
+                onClick={() => setActiveTab('loupe')}
+                style={{
+                  padding: '6px 12px',
+                  background: activeTab === 'loupe' ? 'var(--accent-amber-subtle)' : '#f5f0e8',
+                  border: `1px solid ${activeTab === 'loupe' ? 'var(--accent-amber)' : 'var(--border-subtle)'}`,
+                  borderRadius: '6px',
+                  color: activeTab === 'loupe' ? 'var(--accent-amber)' : 'var(--text-secondary)',
+                  fontFamily: 'var(--font-hud)',
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  transition: 'all 0.18s ease',
+                }}
+              >
+                [04] 3X LOUPE & CLAHE
+              </button>
+
+              <button
+                onClick={() => setActiveTab('hud')}
+                style={{
+                  padding: '6px 12px',
+                  background: activeTab === 'hud' ? 'var(--accent-amber-subtle)' : '#f5f0e8',
+                  border: `1px solid ${activeTab === 'hud' ? 'var(--accent-amber)' : 'var(--border-subtle)'}`,
+                  borderRadius: '6px',
+                  color: activeTab === 'hud' ? 'var(--accent-amber)' : 'var(--text-secondary)',
+                  fontFamily: 'var(--font-hud)',
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  transition: 'all 0.18s ease',
+                }}
+              >
+                [05] HUD INSPECTOR
+              </button>
+            </div>
+
+            {/* Tab Views */}
+            {activeTab === 'matrix' && (
+              <EvidenceVisualizer
+                evidence={response?.evidence || null}
+                isLoading={isLoading}
+              />
+            )}
+
+            {activeTab === 'indices' && (
+              <SpectralIndicesDeck
+                fileA={fileA}
+                previewA={previewA}
+              />
+            )}
+
+            {activeTab === 'swipe' && (
+              <BitemporalSwipeSlider
+                imageBefore={previewA}
+                imageAfter={previewB}
+              />
+            )}
+
+            {activeTab === 'loupe' && (
+              <GeospatialLoupeEnhancer
+                imageSrc={previewA}
+              />
+            )}
+
+            {activeTab === 'hud' && (
+              <GeospatialTelemetryHUD
+                imageSrc={previewA}
+              />
+            )}
+
+            {/* VLM Synthesized Intelligence Terminal */}
             <VlmSynthesisTerminal
               answer={response?.answer || null}
               confidence={response?.trace?.confidence}
               isLoading={isLoading}
             />
 
+            {/* Flight Recorder Execution Trace */}
             <ExecutionTraceDeck
               trace={response?.trace || null}
               fullResponse={response}
@@ -204,6 +395,14 @@ export default function GroundStationPage() {
 
         {/* Verified Mission Archive Presets */}
         <MissionArchiveGallery onSelectMission={handleSelectMission} />
+
+        {/* Mission Briefing PDF Modal */}
+        <MissionBriefingModal
+          isOpen={isBriefingOpen}
+          onClose={() => setIsBriefingOpen(false)}
+          query={query}
+          response={response}
+        />
 
         {/* Footer */}
         <footer

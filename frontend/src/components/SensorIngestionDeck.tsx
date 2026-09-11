@@ -64,7 +64,7 @@ export const SensorIngestionDeck: React.FC<SensorIngestionDeckProps> = ({
           </svg>
           <span>SENSOR INGESTION</span>
         </div>
-        <span className="panel-title-tag">DUAL CHANNEL</span>
+        <span className="panel-title-tag">DUAL CHANNEL // FULL VISIBILITY</span>
       </div>
 
       <div className="sensor-ports-grid">
@@ -73,7 +73,7 @@ export const SensorIngestionDeck: React.FC<SensorIngestionDeckProps> = ({
           <div
             className={`sensor-dropzone ${previewA ? 'has-file' : ''}`}
             style={{
-              borderColor: isDraggingA ? 'var(--accent-kapton)' : undefined,
+              borderColor: isDraggingA ? 'var(--accent-amber)' : undefined,
             }}
             onClick={() => !previewA && inputARef.current?.click()}
             onDragOver={(e) => {
@@ -99,6 +99,24 @@ export const SensorIngestionDeck: React.FC<SensorIngestionDeckProps> = ({
             {previewA ? (
               <>
                 <img src={previewA} alt="Sensor A Swath" className="sensor-preview-image" />
+                <div
+                  style={{
+                    position: 'absolute',
+                    bottom: '6px',
+                    left: '6px',
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: '9.5px',
+                    fontWeight: 700,
+                    padding: '3px 8px',
+                    borderRadius: '4px',
+                    background: 'rgba(255, 255, 255, 0.94)',
+                    color: 'var(--accent-amber)',
+                    border: '1px solid var(--accent-amber-border)',
+                    boxShadow: '0 2px 6px rgba(0, 0, 0, 0.08)',
+                  }}
+                >
+                  SENSOR A: INGESTED
+                </div>
                 <button
                   className="sensor-remove-btn"
                   title="Remove image"
@@ -116,7 +134,7 @@ export const SensorIngestionDeck: React.FC<SensorIngestionDeckProps> = ({
               </>
             ) : (
               <div className="cell-empty-state">
-                <div style={{ color: 'var(--accent-kapton)', marginBottom: '2px' }}>
+                <div style={{ color: 'var(--accent-amber)', marginBottom: '2px' }}>
                   {/* Optical Lens Aperture Vector */}
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
                     <circle cx="12" cy="12" r="10" />
@@ -132,7 +150,7 @@ export const SensorIngestionDeck: React.FC<SensorIngestionDeckProps> = ({
                   SENSOR A (PRIMARY)
                 </div>
                 <div style={{ fontSize: '10.5px', color: 'var(--text-muted)' }}>
-                  Optical RGB / GeoTIFF
+                  Optical RGB / GeoTIFF (Uncropped)
                 </div>
               </div>
             )}
@@ -154,7 +172,7 @@ export const SensorIngestionDeck: React.FC<SensorIngestionDeckProps> = ({
           <div
             className={`sensor-dropzone ${previewB ? 'has-file' : ''}`}
             style={{
-              borderColor: isDraggingB ? 'var(--accent-mint)' : undefined,
+              borderColor: isDraggingB ? 'var(--accent-emerald)' : undefined,
             }}
             onClick={() => !previewB && inputBRef.current?.click()}
             onDragOver={(e) => {
@@ -180,6 +198,24 @@ export const SensorIngestionDeck: React.FC<SensorIngestionDeckProps> = ({
             {previewB ? (
               <>
                 <img src={previewB} alt="Sensor B Swath" className="sensor-preview-image" />
+                <div
+                  style={{
+                    position: 'absolute',
+                    bottom: '6px',
+                    left: '6px',
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: '9.5px',
+                    fontWeight: 700,
+                    padding: '3px 8px',
+                    borderRadius: '4px',
+                    background: 'rgba(255, 255, 255, 0.94)',
+                    color: 'var(--accent-emerald)',
+                    border: '1px solid var(--accent-emerald-border)',
+                    boxShadow: '0 2px 6px rgba(0, 0, 0, 0.08)',
+                  }}
+                >
+                  SENSOR B: INGESTED
+                </div>
                 <button
                   className="sensor-remove-btn"
                   title="Remove secondary image"
@@ -197,7 +233,7 @@ export const SensorIngestionDeck: React.FC<SensorIngestionDeckProps> = ({
               </>
             ) : (
               <div className="cell-empty-state">
-                <div style={{ color: 'var(--accent-mint)', marginBottom: '2px' }}>
+                <div style={{ color: 'var(--accent-emerald)', marginBottom: '2px' }}>
                   {/* Radar Waveform Vector */}
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
                     <path d="M2 12h3l3-8 4 16 3-8h7" />

@@ -133,7 +133,7 @@ export const TacticalUplinkBar: React.FC<TacticalUplinkBarProps> = ({
       >
         {isLoading ? (
           <>
-            <div className="pulse-dot" style={{ background: '#080c14' }} />
+            <div className="pulse-dot" style={{ background: '#ffffff' }} />
             <span>ORBITAL REASONING IN PROGRESS...</span>
           </>
         ) : (

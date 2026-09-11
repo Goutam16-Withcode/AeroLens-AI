@@ -40,13 +40,13 @@ export const VlmSynthesisTerminal: React.FC<VlmSynthesisTerminalProps> = ({
   const getConfidenceDetails = (conf: number | null | undefined) => {
     if (conf === null || conf === undefined) return null;
     const pct = Math.round(conf * 100);
-    let color = 'var(--accent-mint)';
+    let color = 'var(--accent-emerald)';
     let level = 'HIGH';
     if (pct < 70) {
-      color = 'var(--accent-swir)';
+      color = 'var(--accent-coral)';
       level = 'LOW';
     } else if (pct < 85) {
-      color = 'var(--accent-kapton)';
+      color = 'var(--accent-amber)';
       level = 'MODERATE';
     }
     return { pct, color, level };
@@ -73,20 +73,22 @@ export const VlmSynthesisTerminal: React.FC<VlmSynthesisTerminalProps> = ({
               style={{
                 fontFamily: 'var(--font-mono)',
                 fontSize: '11px',
-                padding: '3px 8px',
+                fontWeight: 700,
+                padding: '3px 9px',
                 borderRadius: '4px',
-                border: `1px solid ${conf.color}44`,
-                background: 'rgba(15, 23, 42, 0.7)',
+                border: `1px solid ${conf.color}55`,
+                background: '#ffffff',
                 color: conf.color,
                 display: 'flex',
                 alignItems: 'center',
                 gap: '5px',
+                boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
               }}
             >
               <div
                 style={{
-                  width: '5px',
-                  height: '5px',
+                  width: '6px',
+                  height: '6px',
                   borderRadius: '50%',
                   background: conf.color,
                 }}
@@ -102,15 +104,17 @@ export const VlmSynthesisTerminal: React.FC<VlmSynthesisTerminalProps> = ({
                 style={{
                   fontFamily: 'var(--font-mono)',
                   fontSize: '10.5px',
-                  padding: '4px 8px',
-                  background: speaking ? 'var(--accent-kapton-subtle)' : '#0f1728',
-                  border: '1px solid var(--border-subtle)',
+                  fontWeight: 600,
+                  padding: '4px 9px',
+                  background: speaking ? 'var(--accent-amber-subtle)' : '#f5f0e8',
+                  border: `1px solid ${speaking ? 'var(--accent-amber)' : 'var(--border-subtle)'}`,
                   borderRadius: '4px',
-                  color: speaking ? 'var(--accent-kapton)' : 'var(--text-secondary)',
+                  color: speaking ? 'var(--accent-amber)' : 'var(--text-secondary)',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '4px',
+                  transition: 'all 0.18s ease',
                 }}
                 title="Read aloud"
               >
@@ -126,15 +130,17 @@ export const VlmSynthesisTerminal: React.FC<VlmSynthesisTerminalProps> = ({
                 style={{
                   fontFamily: 'var(--font-mono)',
                   fontSize: '10.5px',
+                  fontWeight: 600,
                   padding: '4px 10px',
-                  background: copied ? 'rgba(16, 185, 129, 0.12)' : '#0f1728',
-                  border: `1px solid ${copied ? 'var(--accent-mint)' : 'var(--border-subtle)'}`,
+                  background: copied ? 'var(--accent-emerald-subtle)' : '#f5f0e8',
+                  border: `1px solid ${copied ? 'var(--accent-emerald)' : 'var(--border-subtle)'}`,
                   borderRadius: '4px',
-                  color: copied ? 'var(--accent-mint)' : 'var(--text-secondary)',
+                  color: copied ? 'var(--accent-emerald)' : 'var(--text-secondary)',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '4px',
+                  transition: 'all 0.18s ease',
                 }}
               >
                 {copied ? (
@@ -161,10 +167,10 @@ export const VlmSynthesisTerminal: React.FC<VlmSynthesisTerminalProps> = ({
 
       <div className="intel-report-box">
         {isLoading ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--accent-kapton)', padding: '6px 0' }}>
-            <div className="pulse-dot" style={{ background: 'var(--accent-kapton)' }} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--accent-amber)', padding: '6px 0' }}>
+            <div className="pulse-dot" style={{ background: 'var(--accent-amber)' }} />
             <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px' }}>
-              Qwen3-VL-4B neural reasoning in progress... Synthesizing multi-spectral downlink...
+              Qwen3-VL neural reasoning in progress... Synthesizing multi-spectral downlink...
             </span>
           </div>
         ) : answer ? (

@@ -44,7 +44,7 @@ export const OrbitalHeader: React.FC<OrbitalHeaderProps> = ({ status: propStatus
       <div className="brand-section">
         <div className="brand-icon-box">
           {/* Scientific Satellite Swath Aperture */}
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <polygon points="12 2 2 7 12 12 22 7 12 2" />
             <polyline points="2 17 12 22 22 17" />
             <polyline points="2 12 12 17 22 12" />
@@ -67,7 +67,7 @@ export const OrbitalHeader: React.FC<OrbitalHeaderProps> = ({ status: propStatus
         </div>
 
         <div className="pill-badge">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--accent-kapton)" strokeWidth="2">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--accent-amber)" strokeWidth="2.5">
             <circle cx="12" cy="12" r="10" />
             <ellipse cx="12" cy="12" rx="10" ry="4" transform="rotate(45 12 12)" />
           </svg>
@@ -75,16 +75,16 @@ export const OrbitalHeader: React.FC<OrbitalHeaderProps> = ({ status: propStatus
         </div>
 
         <div className="pill-badge">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
             <rect x="4" y="4" width="16" height="16" rx="2" />
             <line x1="9" y1="9" x2="15" y2="9" />
             <line x1="9" y1="15" x2="15" y2="15" />
           </svg>
-          <span>{liveStatus?.device || 'QWEN3-VL-4B INFERENCE'}</span>
+          <span>{liveStatus?.adaptation || 'OPENROUTER CLOUD VLM'}</span>
         </div>
 
         <div className="pill-badge">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
             <circle cx="12" cy="12" r="10" />
             <polyline points="12 6 12 12 16 14" />
           </svg>
