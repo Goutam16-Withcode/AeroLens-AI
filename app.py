@@ -157,8 +157,23 @@ def _is_cuda_supported() -> bool:
         return False
 
 
+try:
+    from src.satquery.core.cloud_vlm import (
+        is_cloud_vlm_enabled,
+        call_cloud_vlm,
+        parse_and_draw_boxes,
+    )
+    _HAS_CLOUD_VLM = True
+except Exception:
+    _HAS_CLOUD_VLM = False
+    def is_cloud_vlm_enabled(): return False
+
+
 def _load():
     global _model, _processor
+    if _HAS_CLOUD_VLM and is_cloud_vlm_enabled():
+        return "cloud_vlm_engine", "cloud_vlm_processor"
+
     if _model is not None:
         return _model, _processor
 
@@ -200,6 +215,8 @@ def _load():
 
 
 def adaptation_status() -> str:
+    if _HAS_CLOUD_VLM and is_cloud_vlm_enabled():
+        return "Cloud VLM (OpenRouter Active) · Zero-Latency Neural Core"
     device_name = "GPU (CUDA)" if _is_cuda_supported() and os.getenv("SATQUERY_FORCE_CPU", "0") != "1" else "CPU Mode"
     adapt = "BigEarthNet LoRA adapter (loaded)" if _adapter_loaded else "Base Model"
     return f"{adapt} · {device_name}"
