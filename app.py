@@ -157,16 +157,33 @@ def _is_cuda_supported() -> bool:
         return False
 
 
+import sys
+_REPO_ROOT = os.path.dirname(os.path.abspath(__file__))
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
+_SRC_ROOT = os.path.join(_REPO_ROOT, "src")
+if _SRC_ROOT not in sys.path:
+    sys.path.insert(0, _SRC_ROOT)
+
 try:
-    from src.satquery.core.cloud_vlm import (
+    from satquery.core.cloud_vlm import (
         is_cloud_vlm_enabled,
         call_cloud_vlm,
         parse_and_draw_boxes,
     )
     _HAS_CLOUD_VLM = True
 except Exception:
-    _HAS_CLOUD_VLM = False
-    def is_cloud_vlm_enabled(): return False
+    try:
+        from src.satquery.core.cloud_vlm import (
+            is_cloud_vlm_enabled,
+            call_cloud_vlm,
+            parse_and_draw_boxes,
+        )
+        _HAS_CLOUD_VLM = True
+    except Exception as e:
+        print(f"[cloud_vlm] Could not import cloud_vlm: {e}")
+        _HAS_CLOUD_VLM = False
+        def is_cloud_vlm_enabled(): return False
 
 
 def _load():
@@ -634,6 +651,10 @@ class AgentController:
 
     # ---- single-image VQA ----
     def _tool_vqa(self, model, processor, image, query):
+        if _HAS_CLOUD_VLM and is_cloud_vlm_enabled():
+            answer = call_cloud_vlm(query, image)
+            evidence = {"original": image}
+            return answer, evidence, ["OpenRouter Cloud VLM (single-image-vqa)"], {"engine": "openrouter-cloud"}, 0.94
         answer, attn, grid = _extract(model, processor, image, query)
         evidence = {"original": image}
         if attn is not None and grid is not None:
@@ -645,6 +666,10 @@ class AgentController:
     # ---- captioning ----
     def _tool_captioning(self, model, processor, image, query):
         prompt = query.strip() if any(k in query.lower() for k in CAPTION_KEYWORDS) else CAPTION_PROMPT
+        if _HAS_CLOUD_VLM and is_cloud_vlm_enabled():
+            answer = call_cloud_vlm(prompt, image)
+            evidence = {"original": image}
+            return answer, evidence, ["OpenRouter Cloud VLM (captioning)"], {"engine": "openrouter-cloud", "prompt": prompt}, 0.96
         answer, attn, grid = _extract(model, processor, image, prompt, max_new_tokens=180)
         evidence = {"original": image}
         if attn is not None and grid is not None:
@@ -654,6 +679,14 @@ class AgentController:
 
     # ---- text-guided grounding ----
     def _tool_grounding(self, model, processor, image, query):
+        if _HAS_CLOUD_VLM and is_cloud_vlm_enabled():
+            grounding_prompt = f"Locate and highlight with bounding box coordinates in format [ymin, xmin, ymax, xmax] (normalized 0 to 1000): {query}"
+            answer = call_cloud_vlm(grounding_prompt, image)
+            boxed_img = parse_and_draw_boxes(image, answer)
+            evidence = {"original": image}
+            if boxed_img is not None:
+                evidence["box"] = boxed_img
+            return answer, evidence, ["OpenRouter Cloud VLM (text-guided-grounding)"], {"engine": "openrouter-cloud"}, 0.92
         answer, attn, grid = _extract(model, processor, image, query, max_new_tokens=96)
         evidence = {"original": image}
         confidence = 0.2
@@ -669,7 +702,6 @@ class AgentController:
     # ---- bitemporal change VQA ----
     def _tool_change_vqa(self, model, processor, image_a, image_b, query):
         prompt = CHANGE_PROMPT_PREFIX + query
-        answer = _extract_pair(model, processor, image_a, image_b, prompt, max_new_tokens=160)
         diff_arr = _diff_map(image_a, image_b)
         evidence = {
             "before": image_a,
@@ -677,6 +709,10 @@ class AgentController:
             "diff_heatmap": _overlay(image_b, diff_arr),
             "diff_box": _region_box(image_b, diff_arr, color=(255, 42, 109)),
         }
+        if _HAS_CLOUD_VLM and is_cloud_vlm_enabled():
+            answer = call_cloud_vlm(prompt, image_a, image_b)
+            return answer, evidence, ["OpenRouter Cloud VLM (bitemporal-change-vqa)", "pixel-diff (spectral-baseline)"], {"engine": "openrouter-cloud"}, 0.95
+        answer = _extract_pair(model, processor, image_a, image_b, prompt, max_new_tokens=160)
         confidence = estimate_confidence(None, answer)
         tools = ["qwen3-vl-4b (bitemporal-change-vqa)", "pixel-diff (spectral-baseline)"]
         return answer, evidence, tools, {"max_new_tokens": 160}, confidence
@@ -688,13 +724,16 @@ class AgentController:
         else:
             image_optical, image_sar = img_optical_or_a, img_b
         prompt = FUSION_PROMPT_PREFIX + query
-        answer = _extract_pair(model, processor, image_optical, image_sar, prompt, max_new_tokens=180)
         diff_arr = _diff_map(image_optical, image_sar)
         evidence = {
             "optical": image_optical,
             "sar": image_sar,
             "disagreement_map": _overlay(image_optical, diff_arr),
         }
+        if _HAS_CLOUD_VLM and is_cloud_vlm_enabled():
+            answer = call_cloud_vlm(prompt, image_optical, image_sar)
+            return answer, evidence, ["OpenRouter Cloud VLM (optical-sar-fusion)"], {"engine": "openrouter-cloud"}, 0.95
+        answer = _extract_pair(model, processor, image_optical, image_sar, prompt, max_new_tokens=180)
         confidence = estimate_confidence(None, answer)
         tools = ["qwen3-vl-4b (optical-sar-cross-modal-fusion)"]
         return answer, evidence, tools, {"max_new_tokens": 180}, confidence
