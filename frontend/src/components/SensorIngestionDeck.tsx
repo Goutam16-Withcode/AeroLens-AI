@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useRef, useState } from 'react';
+import { ImageLightboxModal } from './ImageLightboxModal';
 
 interface SensorIngestionDeckProps {
   fileA: File | null;
@@ -37,6 +38,7 @@ export const SensorIngestionDeck: React.FC<SensorIngestionDeckProps> = ({
 
   const [isDraggingA, setIsDraggingA] = useState(false);
   const [isDraggingB, setIsDraggingB] = useState(false);
+  const [modalImg, setModalImg] = useState<{ src: string; title: string } | null>(null);
 
   const handleFileA = (file?: File) => {
     if (file) {
@@ -98,7 +100,17 @@ export const SensorIngestionDeck: React.FC<SensorIngestionDeckProps> = ({
 
             {previewA ? (
               <>
-                <img src={previewA} alt="Sensor A Swath" className="sensor-preview-image" />
+                <img
+                  src={previewA}
+                  alt="Sensor A Swath"
+                  className="sensor-preview-image"
+                  style={{ cursor: 'zoom-in' }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setModalImg({ src: previewA, title: 'PRIMARY SENSOR A INGESTION STREAM' });
+                  }}
+                  title="Click to view enlarged frame with zoom and download"
+                />
                 <div
                   style={{
                     position: 'absolute',
@@ -117,6 +129,19 @@ export const SensorIngestionDeck: React.FC<SensorIngestionDeckProps> = ({
                 >
                   SENSOR A: INGESTED
                 </div>
+                <button
+                  className="sensor-remove-btn"
+                  title="Inspect & Download Image"
+                  style={{ right: '34px', background: 'rgba(28, 25, 23, 0.85)', color: '#ffffff' }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setModalImg({ src: previewA, title: 'PRIMARY SENSOR A INGESTION STREAM' });
+                  }}
+                >
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
+                  </svg>
+                </button>
                 <button
                   className="sensor-remove-btn"
                   title="Remove image"
@@ -197,7 +222,17 @@ export const SensorIngestionDeck: React.FC<SensorIngestionDeckProps> = ({
 
             {previewB ? (
               <>
-                <img src={previewB} alt="Sensor B Swath" className="sensor-preview-image" />
+                <img
+                  src={previewB}
+                  alt="Sensor B Swath"
+                  className="sensor-preview-image"
+                  style={{ cursor: 'zoom-in' }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setModalImg({ src: previewB, title: 'SECONDARY SENSOR B INGESTION STREAM' });
+                  }}
+                  title="Click to view enlarged frame with zoom and download"
+                />
                 <div
                   style={{
                     position: 'absolute',
@@ -216,6 +251,19 @@ export const SensorIngestionDeck: React.FC<SensorIngestionDeckProps> = ({
                 >
                   SENSOR B: INGESTED
                 </div>
+                <button
+                  className="sensor-remove-btn"
+                  title="Inspect & Download Image"
+                  style={{ right: '34px', background: 'rgba(28, 25, 23, 0.85)', color: '#ffffff' }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setModalImg({ src: previewB, title: 'SECONDARY SENSOR B INGESTION STREAM' });
+                  }}
+                >
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
+                  </svg>
+                </button>
                 <button
                   className="sensor-remove-btn"
                   title="Remove secondary image"
@@ -260,6 +308,15 @@ export const SensorIngestionDeck: React.FC<SensorIngestionDeckProps> = ({
           </select>
         </div>
       </div>
+
+      {modalImg && (
+        <ImageLightboxModal
+          isOpen={Boolean(modalImg)}
+          onClose={() => setModalImg(null)}
+          imageSrc={modalImg.src}
+          title={modalImg.title}
+        />
+      )}
     </div>
   );
 };

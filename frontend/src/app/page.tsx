@@ -14,6 +14,7 @@ import { GeospatialTelemetryHUD } from '../components/GeospatialTelemetryHUD';
 import { GeospatialLoupeEnhancer } from '../components/GeospatialLoupeEnhancer';
 import { SatelliteOrbitRadar } from '../components/SatelliteOrbitRadar';
 import { MissionBriefingModal } from '../components/MissionBriefingModal';
+import { DetectedObjectsDeck } from '../components/DetectedObjectsDeck';
 import { AnalysisResponse, BenchmarkMission } from '../types/satquery';
 
 function dataURLtoFile(dataurl: string, filename: string): File {
@@ -45,7 +46,7 @@ export default function GroundStationPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Active View Tab on Right Column
-  const [activeTab, setActiveTab] = useState<'matrix' | 'indices' | 'swipe' | 'hud' | 'loupe' | 'radar'>('matrix');
+  const [activeTab, setActiveTab] = useState<'matrix' | 'indices' | 'swipe' | 'hud' | 'loupe' | 'radar' | 'objects'>('matrix');
 
   // Mission Briefing Modal
   const [isBriefingOpen, setIsBriefingOpen] = useState<boolean>(false);
@@ -58,6 +59,9 @@ export default function GroundStationPage() {
     if (mission.image_a_preview) {
       setPreviewA(mission.image_a_preview);
       setFileA(dataURLtoFile(mission.image_a_preview, 'sensor_a.png'));
+    } else {
+      setPreviewA(null);
+      setFileA(null);
     }
 
     if (mission.image_b_preview) {
@@ -67,13 +71,11 @@ export default function GroundStationPage() {
       setPreviewB(null);
       setFileB(null);
     }
-
-    window.scrollTo({ top: 100, behavior: 'smooth' });
   };
 
   const handleTransmit = async () => {
     if (!fileA && !previewA) {
-      setErrorMessage('Please ingest primary Sensor A swath or select a verified benchmark mission preset below.');
+      setErrorMessage('Telemetry Alert: Primary sensor swath (Image A) is required.');
       return;
     }
     if (!query.trim()) {
@@ -114,6 +116,9 @@ export default function GroundStationPage() {
       }
 
       setResponse(data);
+      if (data.detected_objects && data.detected_objects.length > 0) {
+        setActiveTab('objects');
+      }
     } catch (err: any) {
       setErrorMessage(err.message || 'Ground station downlink disconnected. Please ensure the backend is running.');
     } finally {
@@ -342,6 +347,41 @@ export default function GroundStationPage() {
               >
                 [05] HUD INSPECTOR
               </button>
+
+              <button
+                onClick={() => setActiveTab('objects')}
+                style={{
+                  padding: '6px 12px',
+                  background: activeTab === 'objects' ? 'var(--accent-amber-subtle)' : '#f5f0e8',
+                  border: `1px solid ${activeTab === 'objects' ? 'var(--accent-amber)' : 'var(--border-subtle)'}`,
+                  borderRadius: '6px',
+                  color: activeTab === 'objects' ? 'var(--accent-amber)' : 'var(--text-secondary)',
+                  fontFamily: 'var(--font-hud)',
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  transition: 'all 0.18s ease',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                }}
+              >
+                <span>[06] TARGET DETECTIONS</span>
+                {response?.detected_objects && response.detected_objects.length > 0 && (
+                  <span
+                    style={{
+                      background: 'var(--accent-amber)',
+                      color: '#ffffff',
+                      borderRadius: '10px',
+                      padding: '1px 6px',
+                      fontSize: '9.5px',
+                      fontWeight: 800,
+                    }}
+                  >
+                    {response.detected_objects.length}
+                  </span>
+                )}
+              </button>
             </div>
 
             {/* Tab Views */}
@@ -375,6 +415,14 @@ export default function GroundStationPage() {
             {activeTab === 'hud' && (
               <GeospatialTelemetryHUD
                 imageSrc={previewA}
+              />
+            )}
+
+            {activeTab === 'objects' && (
+              <DetectedObjectsDeck
+                objects={response?.detected_objects || []}
+                annotatedImage={response?.evidence?.slot3_reticle_or_sar || null}
+                isLoading={isLoading}
               />
             )}
 

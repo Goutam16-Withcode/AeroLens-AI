@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { EvidencePayload } from '../types/satquery';
+import { ImageLightboxModal } from './ImageLightboxModal';
 
 interface EvidenceVisualizerProps {
   evidence: EvidencePayload | null;
@@ -115,22 +116,14 @@ export const EvidenceVisualizer: React.FC<EvidenceVisualizerProps> = ({ evidence
         </div>
       </div>
 
-      {/* Lightbox / Zoom Modal */}
+      {/* Lightbox / Zoom Modal with Download */}
       {modalImage && (
-        <div className="image-modal-backdrop" onClick={() => setModalImage(null)}>
-          <div className="image-modal-content" onClick={(e) => e.stopPropagation()}>
-            <button className="modal-close-btn" onClick={() => setModalImage(null)}>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <line x1="18" y1="6" x2="6" y2="18" />
-                <line x1="6" y1="6" x2="18" y2="18" />
-              </svg>
-            </button>
-            <div style={{ fontFamily: 'var(--font-hud)', fontSize: '12px', color: 'var(--accent-amber)', marginBottom: '8px' }}>
-              {modalImage.title}
-            </div>
-            <img src={modalImage.src} alt={modalImage.title} />
-          </div>
-        </div>
+        <ImageLightboxModal
+          isOpen={Boolean(modalImage)}
+          onClose={() => setModalImage(null)}
+          imageSrc={modalImage.src}
+          title={modalImage.title}
+        />
       )}
     </>
   );

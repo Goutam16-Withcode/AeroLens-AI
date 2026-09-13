@@ -17,9 +17,23 @@ export interface EvidencePayload {
   slot4_after: string | null;
 }
 
+export interface DetectedObject {
+  id: string;
+  label: string;
+  category: string;
+  confidence: number;
+  ymin: number;
+  xmin: number;
+  ymax: number;
+  xmax: number;
+  pixel_coords?: [number, number, number, number];
+  color?: string;
+}
+
 export interface AnalysisResponse {
   answer: string;
   evidence: EvidencePayload;
+  detected_objects?: DetectedObject[];
   trace: ExecutionTrace | null;
   trace_markdown?: string;
   error?: string;

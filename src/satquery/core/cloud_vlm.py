@@ -229,11 +229,50 @@ def extract_bounding_boxes(text: str, w: int, h: int) -> List[Dict[str, Any]]:
                     "color": f"rgb({color[0]}, {color[1]}, {color[2]})",
                 })
 
-    return results
+    # Apply IoU Non-Maximum Suppression to remove duplicate/overlapping bounding boxes
+    return apply_nms(results, iou_thresh=0.45)
+
+
+def _compute_box_iou(box1: Dict[str, Any], box2: Dict[str, Any]) -> float:
+    y1 = max(box1["ymin"], box2["ymin"])
+    x1 = max(box1["xmin"], box2["xmin"])
+    y2 = min(box1["ymax"], box2["ymax"])
+    x2 = min(box1["xmax"], box2["xmax"])
+    inter_area = max(0.0, x2 - x1) * max(0.0, y2 - y1)
+    box1_area = max(0.0, box1["ymax"] - box1["ymin"]) * max(0.0, box1["xmax"] - box1["xmin"])
+    box2_area = max(0.0, box2["ymax"] - box2["ymin"]) * max(0.0, box2["xmax"] - box2["xmin"])
+    union_area = box1_area + box2_area - inter_area
+    if union_area <= 1e-8:
+        return 0.0
+    return inter_area / union_area
+
+
+def apply_nms(boxes: List[Dict[str, Any]], iou_thresh: float = 0.45) -> List[Dict[str, Any]]:
+    """Suppresses duplicate and overlapping bounding boxes using IoU threshold."""
+    if not boxes:
+        return []
+    sorted_boxes = sorted(boxes, key=lambda b: float(b.get("confidence", 0.9)), reverse=True)
+    selected: List[Dict[str, Any]] = []
+
+    for b in sorted_boxes:
+        area = (b["ymax"] - b["ymin"]) * (b["xmax"] - b["xmin"])
+        if area > 0.85 or area < 0.0005:  # Ignore whole-scene or microscopic noise
+            continue
+        overlap = False
+        for s in selected:
+            if _compute_box_iou(b, s) > iou_thresh:
+                overlap = True
+                break
+        if not overlap:
+            selected.append(b)
+
+    for idx, b in enumerate(selected):
+        b["id"] = f"det_{idx + 1}"
+    return selected
 
 
 def draw_bounding_boxes(img: Image.Image, bboxes: List[Dict[str, Any]]) -> Image.Image:
-    """Draw aerospace tactical HUD bounding boxes with semi-transparent fills, outer strokes, corner reticles, and label badges."""
+    """Draw crisp aerospace tactical HUD reticles with completely transparent interiors and micro-badges."""
     w, h = img.size
     overlay = img.copy().convert("RGBA")
     draw = ImageDraw.Draw(overlay, "RGBA")
@@ -250,35 +289,34 @@ def draw_bounding_boxes(img: Image.Image, bboxes: List[Dict[str, Any]]) -> Image
         label = box.get("label", "target")
         conf = box.get("confidence", 0.90)
         color = get_category_color(label)
-        fill_color = (color[0], color[1], color[2], 50)  # ~20% opacity tinted fill
-        border_color = (color[0], color[1], color[2], 240)
+        border_color = (color[0], color[1], color[2], 255)
 
-        # 1. Semi-transparent fill + solid outer border
-        draw.rectangle([xmin, ymin, xmax, ymax], fill=fill_color, outline=border_color, width=3)
+        # 1. CRISP 2px BORDER WITH 100% TRANSPARENT INTERIOR (NO FILL TO ENSURE SATELLITE DETAILS REMAIN VISIBLE)
+        draw.rectangle([xmin, ymin, xmax, ymax], fill=None, outline=border_color, width=2)
 
-        # 2. Tactical Corner Reticles / Crosshairs
+        # 2. Tactical Corner Crosshairs (L-shaped precision brackets)
         box_w = xmax - xmin
         box_h = ymax - ymin
-        arm = max(6, min(18, box_w // 4, box_h // 4))
-        reticle_color = (255, 255, 255, 250)
-        draw.line([(xmin, ymin), (xmin + arm, ymin)], fill=reticle_color, width=4)
-        draw.line([(xmin, ymin), (xmin, ymin + arm)], fill=reticle_color, width=4)
-        draw.line([(xmax, ymin), (xmax - arm, ymin)], fill=reticle_color, width=4)
-        draw.line([(xmax, ymin), (xmax, ymin + arm)], fill=reticle_color, width=4)
-        draw.line([(xmin, ymax), (xmin + arm, ymax)], fill=reticle_color, width=4)
-        draw.line([(xmin, ymax), (xmin, ymax - arm)], fill=reticle_color, width=4)
-        draw.line([(xmax, ymax), (xmax - arm, ymax)], fill=reticle_color, width=4)
-        draw.line([(xmax, ymax), (xmax, ymax - arm)], fill=reticle_color, width=4)
+        arm = max(5, min(14, box_w // 5, box_h // 5))
+        reticle_color = (255, 255, 255, 240)
+        draw.line([(xmin, ymin), (xmin + arm, ymin)], fill=reticle_color, width=3)
+        draw.line([(xmin, ymin), (xmin, ymin + arm)], fill=reticle_color, width=3)
+        draw.line([(xmax, ymin), (xmax - arm, ymin)], fill=reticle_color, width=3)
+        draw.line([(xmax, ymin), (xmax, ymin + arm)], fill=reticle_color, width=3)
+        draw.line([(xmin, ymax), (xmin + arm, ymax)], fill=reticle_color, width=3)
+        draw.line([(xmin, ymax), (xmin, ymax - arm)], fill=reticle_color, width=3)
+        draw.line([(xmax, ymax), (xmax - arm, ymax)], fill=reticle_color, width=3)
+        draw.line([(xmax, ymax), (xmax, ymax - arm)], fill=reticle_color, width=3)
 
-        # 3. Label Tag Badge with dark contrast backing
-        tag_text = f"{label.upper()} #{idx + 1} ({int(conf * 100)}%)"
-        tag_h = 20
-        tag_w = max(70, len(tag_text) * 7 + 12)
-        tag_y1 = max(0, ymin - tag_h - 2)
+        # 3. Compact Micro Label Tag Badge with dark aerospace backing
+        tag_text = f"{label.upper()} #{idx + 1}"
+        tag_h = 16
+        tag_w = max(50, len(tag_text) * 6 + 10)
+        tag_y1 = max(2, ymin - tag_h - 2) if ymin > (tag_h + 4) else (ymin + 2)
         tag_y2 = tag_y1 + tag_h
 
-        draw.rectangle([xmin, tag_y1, xmin + tag_w, tag_y2], fill=(15, 23, 42, 230), outline=border_color, width=1)
-        draw.text((xmin + 6, tag_y1 + 3), tag_text, fill=(255, 255, 255, 255))
+        draw.rectangle([xmin, tag_y1, xmin + tag_w, tag_y2], fill=(15, 23, 42, 235), outline=border_color, width=1)
+        draw.text((xmin + 5, tag_y1 + 1), tag_text, fill=(255, 255, 255, 255))
 
     return overlay.convert("RGB")
 
