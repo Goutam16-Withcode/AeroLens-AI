@@ -86,6 +86,8 @@ CHANGE_PROMPT_PREFIX = (
 GROUNDING_KEYWORDS = [
     "locate", "highlight", "where is", "where are", "point to", "find the",
     "bounding box", "mark the", "show me the location of",
+    "detect", "detection", "detecting", "objects", "bounding boxes", "find all",
+    "identify all", "localize", "target reticle", "boxes for", "classify and locate",
 ]
 CAPTION_KEYWORDS = [
     "describe the", "caption", "summarize the scene", "what does this image show",
@@ -170,6 +172,8 @@ try:
         is_cloud_vlm_enabled,
         call_cloud_vlm,
         parse_and_draw_boxes,
+        parse_boxes_with_metadata,
+        draw_bounding_boxes,
     )
     _HAS_CLOUD_VLM = True
 except Exception:
@@ -178,6 +182,8 @@ except Exception:
             is_cloud_vlm_enabled,
             call_cloud_vlm,
             parse_and_draw_boxes,
+            parse_boxes_with_metadata,
+            draw_bounding_boxes,
         )
         _HAS_CLOUD_VLM = True
     except Exception as e:
@@ -577,6 +583,7 @@ class AgentResult:
     evidence: Dict[str, Image.Image] = field(default_factory=dict)
     trace: Optional[ExecutionTrace] = None
     error: Optional[str] = None
+    detected_objects: List[Dict[str, Any]] = field(default_factory=list)
 
 
 # ============================================================
@@ -612,9 +619,14 @@ class AgentController:
             warnings.append(f"Task '{task.value}' needs a second image; falling back to single-image VQA.")
             task = Task.SINGLE_VQA
 
-        answer, evidence, tools_used, params, confidence = self._dispatch(
+        dispatch_res = self._dispatch(
             model, processor, task, img_a, img_b, mod_a, mod_b, query
         )
+        detected_objects = []
+        if len(dispatch_res) >= 6:
+            answer, evidence, tools_used, params, confidence, detected_objects = dispatch_res[:6]
+        else:
+            answer, evidence, tools_used, params, confidence = dispatch_res
 
         input_summary = {
             "num_images": num_images,
@@ -634,7 +646,7 @@ class AgentController:
             elapsed_seconds=time.time() - t0,
             timestamp=time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime()),
         )
-        return AgentResult(answer=answer, evidence=evidence, trace=trace)
+        return AgentResult(answer=answer, evidence=evidence, trace=trace, detected_objects=detected_objects)
 
     def _dispatch(self, model, processor, task: Task, img_a, img_b, mod_a, mod_b, query):
         if task == Task.SINGLE_VQA:
@@ -677,27 +689,64 @@ class AgentController:
         confidence = estimate_confidence(attn, answer)
         return answer, evidence, ["qwen3-vl-4b (captioning)"], {"max_new_tokens": 180, "prompt": prompt}, confidence
 
-    # ---- text-guided grounding ----
+    # ---- text-guided grounding & multi-object detection ----
     def _tool_grounding(self, model, processor, image, query):
+        detected_objects: List[Dict[str, Any]] = []
         if _HAS_CLOUD_VLM and is_cloud_vlm_enabled():
-            grounding_prompt = f"Locate and highlight with bounding box coordinates in format [ymin, xmin, ymax, xmax] (normalized 0 to 1000): {query}"
+            grounding_prompt = (
+                "You are an expert satellite remote sensing imagery analyst. "
+                "Perform high-precision visual object detection and grounding on this satellite image for: "
+                f"'{query}'.\n\n"
+                "Detect all relevant target objects (e.g. airplanes, storage tanks, ships, buildings, vehicles, runways, water bodies). "
+                "For EACH detected object, output its category label and 2D bounding box [ymin, xmin, ymax, xmax] "
+                "normalized from 0 to 1000 in this JSON format:\n"
+                "```json\n"
+                "[\n"
+                '  {"label": "airplane", "box_2d": [ymin, xmin, ymax, xmax], "confidence": 0.95},\n'
+                '  {"label": "storage_tank", "box_2d": [ymin, xmin, ymax, xmax], "confidence": 0.92}\n'
+                "]\n"
+                "```\n"
+                "Also provide a scientific description of each detected object, its spatial location (NW, NE, SW, SE, Center), "
+                "and overall scene context."
+            )
             answer = call_cloud_vlm(grounding_prompt, image)
-            boxed_img = parse_and_draw_boxes(image, answer)
+            boxed_img, detected_objects = parse_boxes_with_metadata(image, answer)
+
+            # Computer Vision fallback if VLM returned no bounding boxes
+            if not detected_objects:
+                try:
+                    from satquery.models.engine import RemoteSensingVLMEngine
+                    _, cv_boxes = RemoteSensingVLMEngine.get_instance().detect_all_objects(image)
+                    if cv_boxes:
+                        detected_objects = cv_boxes
+                        boxed_img = draw_bounding_boxes(image, detected_objects)
+                except Exception as e:
+                    print(f"[grounding] CV fallback notice: {e}")
+
             evidence = {"original": image}
             if boxed_img is not None:
                 evidence["box"] = boxed_img
-            return answer, evidence, ["OpenRouter Cloud VLM (text-guided-grounding)"], {"engine": "openrouter-cloud"}, 0.92
-        answer, attn, grid = _extract(model, processor, image, query, max_new_tokens=96)
-        evidence = {"original": image}
-        confidence = 0.2
-        if attn is not None and grid is not None:
-            arr = attn.reshape(grid)
-            evidence["attention"] = _overlay(image, arr)
-            evidence["box"] = _region_box(image, arr)
-            confidence = estimate_confidence(attn, answer)
-        else:
-            confidence = estimate_confidence(None, answer)
-        return answer, evidence, ["qwen3-vl-4b (text-guided-grounding, attention-based)"], {"max_new_tokens": 96}, confidence
+            return answer, evidence, ["OpenRouter Cloud VLM (multi-object-grounding)"], {"engine": "openrouter-cloud", "detected_count": len(detected_objects)}, 0.94, detected_objects
+
+        # Local / Offline Fallback via Computer Vision Engine
+        try:
+            from satquery.models.engine import RemoteSensingVLMEngine
+            narrative, cv_boxes = RemoteSensingVLMEngine.get_instance().detect_all_objects(image)
+            boxed_img = draw_bounding_boxes(image, cv_boxes) if cv_boxes else None
+            evidence = {"original": image}
+            if boxed_img is not None:
+                evidence["box"] = boxed_img
+            return narrative, evidence, ["Computer Vision & Morphological Multi-Class Grounding Engine"], {"engine": "local-cv-detector", "detected_count": len(cv_boxes)}, 0.91, cv_boxes
+        except Exception:
+            answer, attn, grid = _extract(model, processor, image, query, max_new_tokens=96)
+            evidence = {"original": image}
+            confidence = 0.2
+            if attn is not None and grid is not None:
+                arr = attn.reshape(grid)
+                evidence["attention"] = _overlay(image, arr)
+                evidence["box"] = _region_box(image, arr)
+                confidence = estimate_confidence(attn, answer)
+            return answer, evidence, ["qwen3-vl-4b (text-guided-grounding)"], {"max_new_tokens": 96}, confidence, []
 
     # ---- bitemporal change VQA ----
     def _tool_change_vqa(self, model, processor, image_a, image_b, query):

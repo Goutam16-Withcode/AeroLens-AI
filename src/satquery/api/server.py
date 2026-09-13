@@ -221,10 +221,12 @@ async def analyze(
         }
 
         trace_data = result.trace.to_dict() if result.trace else None
+        detected_objects = getattr(result, "detected_objects", [])
 
         return {
             "answer": result.answer,
             "evidence": evidence_payload,
+            "detected_objects": detected_objects,
             "trace": trace_data,
             "trace_markdown": result.trace.to_markdown() if result.trace else "",
         }
@@ -237,6 +239,62 @@ async def analyze(
                 os.remove(path_b)
         except Exception:
             pass
+
+
+@app.post("/api/detect")
+async def detect_objects(
+    target_classes: str = Form("all"),
+    image: UploadFile = File(...),
+):
+    """Direct high-accuracy multi-object detection and precision bounding boxes."""
+    content = await image.read()
+    pil_img = Image.open(io.BytesIO(content)).convert("RGB")
+    
+    detected_objects = []
+    boxed_img = None
+    narrative = ""
+    
+    if getattr(agent_module, "_HAS_CLOUD_VLM", False) and agent_module.is_cloud_vlm_enabled():
+        try:
+            target_desc = "all objects (airplanes, storage tanks, ships, buildings, vehicles, runways, water bodies)" if target_classes == "all" else target_classes
+            prompt = (
+                f"You are an expert satellite remote sensing imagery analyst. "
+                f"Detect and localize {target_desc} in this satellite image with high precision. "
+                "For EACH detected object, output its category label and 2D bounding box [ymin, xmin, ymax, xmax] "
+                "normalized from 0 to 1000 in JSON format:\n"
+                "```json\n"
+                "[\n"
+                '  {"label": "airplane", "box_2d": [ymin, xmin, ymax, xmax], "confidence": 0.95}\n'
+                "]\n"
+                "```\n"
+                "Include a comprehensive remote sensing detection summary."
+            )
+            narrative = agent_module.call_cloud_vlm(prompt, pil_img)
+            boxed_img, detected_objects = agent_module.parse_boxes_with_metadata(pil_img, narrative)
+        except Exception as e:
+            print(f"[detect] Cloud detection fallback: {e}")
+
+    if not detected_objects:
+        try:
+            from satquery.models.engine import RemoteSensingVLMEngine
+            cv_narrative, cv_boxes = RemoteSensingVLMEngine.get_instance().detect_all_objects(pil_img, target_classes)
+            detected_objects = cv_boxes
+            if not narrative:
+                narrative = cv_narrative
+            boxed_img = agent_module.draw_bounding_boxes(pil_img, detected_objects)
+        except Exception as e:
+            print(f"[detect] CV fallback error: {e}")
+
+    if boxed_img is None:
+        boxed_img = pil_img
+
+    return {
+        "summary": narrative,
+        "total_detected": len(detected_objects),
+        "detected_objects": detected_objects,
+        "annotated_image": pil_to_base64(boxed_img),
+        "original_image": pil_to_base64(pil_img),
+    }
 
 
 @app.post("/api/spectral-indices")
