@@ -208,11 +208,13 @@ async def analyze(
             )
 
         ev = result.evidence
+        is_single_image = path_b is None
         evidence_payload = {
             "slot1_original": pil_to_base64(ev.get("original") or ev.get("before") or ev.get("optical")),
             "slot2_attention_or_diff": pil_to_base64(ev.get("attention") or ev.get("diff_heatmap") or ev.get("disagreement_map")),
             "slot3_reticle_or_sar": pil_to_base64(ev.get("box") or ev.get("diff_box") or ev.get("sar")),
-            "slot4_after": pil_to_base64(ev.get("after")),
+            "slot4_after": pil_to_base64(ev.get("after") or ev.get("cir")),
+            "is_single_image": is_single_image,
         }
 
         trace_data = result.trace.to_dict() if result.trace else None
@@ -273,7 +275,7 @@ async def detect_objects(
         try:
             from satquery.models.engine import RemoteSensingVLMEngine
             cv_narrative, cv_boxes = RemoteSensingVLMEngine.get_instance().detect_all_objects(pil_img, target_classes)
-            detected_objects = cv_boxes
+            detected_objects = cv_boxes[:20]
             if not narrative:
                 narrative = cv_narrative
             boxed_img = agent_module.draw_bounding_boxes(pil_img, detected_objects)

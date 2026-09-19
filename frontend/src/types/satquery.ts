@@ -15,6 +15,7 @@ export interface EvidencePayload {
   slot2_attention_or_diff: string | null;
   slot3_reticle_or_sar: string | null;
   slot4_after: string | null;
+  is_single_image?: boolean;
 }
 
 export interface DetectedObject {

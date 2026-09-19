@@ -12,6 +12,8 @@ interface EvidenceVisualizerProps {
 export const EvidenceVisualizer: React.FC<EvidenceVisualizerProps> = ({ evidence, isLoading }) => {
   const [modalImage, setModalImage] = useState<{ src: string; title: string } | null>(null);
 
+  const isSingle = evidence?.is_single_image !== false;
+
   const slots = [
     {
       id: 'slot1',
@@ -24,30 +26,30 @@ export const EvidenceVisualizer: React.FC<EvidenceVisualizerProps> = ({ evidence
     },
     {
       id: 'slot2',
-      title: 'SLOT 02: ATTENTION / SENSORY DIFF',
-      badge: 'HEATMAP DELTA',
+      title: isSingle ? 'SLOT 02: ATTENTION SALIENCY' : 'SLOT 02: ATTENTION / SENSORY DIFF',
+      badge: isSingle ? 'NEURAL SALIENCY' : 'HEATMAP DELTA',
       badgeBg: 'rgba(217, 119, 6, 0.1)',
       badgeColor: '#d97706',
       data: evidence?.slot2_attention_or_diff,
-      desc: 'Attention saliency & pixel difference',
+      desc: isSingle ? 'Multi-scale spatial attention gradient' : 'Attention saliency & pixel difference',
     },
     {
       id: 'slot3',
-      title: 'SLOT 03: TARGET RETICLE / SAR',
-      badge: 'BBOX / SAR',
+      title: isSingle ? 'SLOT 03: TARGET RETICLES' : 'SLOT 03: TARGET RETICLE / SAR',
+      badge: isSingle ? 'TARGET RETICLES' : 'BBOX / SAR',
       badgeBg: 'rgba(27, 106, 72, 0.1)',
       badgeColor: '#1b6a48',
       data: evidence?.slot3_reticle_or_sar,
-      desc: 'Grounding coordinates & backscatter',
+      desc: isSingle ? 'Precision tactical corner reticles' : 'Grounding coordinates & backscatter',
     },
     {
       id: 'slot4',
-      title: 'SLOT 04: TEMPORAL T2 / FUSION',
-      badge: 'AFTER PASS',
-      badgeBg: 'rgba(190, 18, 60, 0.1)',
-      badgeColor: '#be123c',
+      title: isSingle ? 'SLOT 04: CIR SPECTRAL SYNTHESIS' : 'SLOT 04: TEMPORAL T2 / FUSION',
+      badge: isSingle ? 'CIR FALSE-COLOR' : 'AFTER PASS',
+      badgeBg: isSingle ? 'rgba(16, 185, 129, 0.1)' : 'rgba(190, 18, 60, 0.1)',
+      badgeColor: isSingle ? '#059669' : '#be123c',
       data: evidence?.slot4_after,
-      desc: 'Post-event secondary sensory frame',
+      desc: isSingle ? 'NASA / USGS Infrared False-Color Composite' : 'Post-event secondary sensory frame',
     },
   ];
 
