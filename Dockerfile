@@ -1,35 +1,37 @@
-# SatQuery AI - Production Multi-Modal Remote Sensing Dockerfile
+# AeroLens AI — Production FastAPI Backend Dockerfile
 FROM python:3.10-slim
 
-# Prevent Python from writing .pyc files & enable unbuffered logging
+# Prevent Python from writing .pyc files & enable unbuffered stdout
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     DEBIAN_FRONTEND=noninteractive \
-    PORT=8501
+    PORT=8000 \
+    PYTHONPATH=/app:/app/src
 
 WORKDIR /app
 
-# Install system dependencies for OpenCV and image processing
+# Install system dependencies for OpenCV, PIL, RasterIO, and geospatial processing
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     curl \
     libgl1 \
     libglib2.0-0 \
+    libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy dependencies first for Docker caching
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy source code and sample data
+# Copy application source code and benchmark samples
 COPY . .
 
-# Expose Streamlit default port
-EXPOSE 8501
+# Expose FastAPI backend port
+EXPOSE 8000
 
-# Healthcheck to verify Streamlit server is responsive
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl --fail http://localhost:8501/_stcore/health || exit 1
+# Healthcheck to verify FastAPI backend is responsive
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+    CMD curl --fail http://localhost:8000/api/status || exit 1
 
-# Launch SatQuery AI
-CMD ["streamlit", "run", "src/satquery/ui/app.py", "--server.port=8501", "--server.address=0.0.0.0"]
+# Launch AeroLens AI FastAPI server
+CMD ["python", "-m", "uvicorn", "src.satquery.api.server:app", "--host", "0.0.0.0", "--port", "8000"]

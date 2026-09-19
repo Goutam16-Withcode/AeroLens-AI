@@ -156,6 +156,8 @@ To shut down:
 docker compose down
 ```
 
+> 📖 **Full Production Deployment Guide**: See [deployment.md](deployment.md) for Linux systemd + PM2 services, Nginx reverse proxy configuration, SSL certificates, Vercel/Render cloud setups, and CI/CD pipelines.
+
 ---
 
 ## 📡 API Reference
