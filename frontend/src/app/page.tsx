@@ -459,6 +459,19 @@ export default function GroundStationPage() {
               <SpectralIndicesDeck
                 fileA={fileA}
                 previewA={previewA}
+                onLoadBenchmarkSwath={async () => {
+                  try {
+                    const r = await fetch('http://localhost:8000/api/examples');
+                    if (r.ok) {
+                      const d = await r.json();
+                      const examples = d.examples || [];
+                      const m = examples.find((ex: any) => ex.image_a_preview) || examples[0];
+                      if (m) handleSelectMission(m);
+                    }
+                  } catch (e) {
+                    console.error('Failed to load benchmark swath:', e);
+                  }
+                }}
               />
             )}
 

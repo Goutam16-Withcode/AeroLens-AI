@@ -771,15 +771,70 @@ export const SpectralIndicesDeck: React.FC<SpectralIndicesDeckProps> = ({ fileA,
             </div>
           </div>
         </div>
+      ) : !previewA ? (
+        <div style={{ padding: '32px 20px', textAlign: 'center', background: '#faf6f0', borderRadius: '8px', border: '1px dashed var(--border-subtle)' }}>
+          <div style={{ color: 'var(--accent-amber)', marginBottom: '8px' }}>
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" style={{ display: 'inline-block' }}>
+              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+            </svg>
+          </div>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '4px' }}>
+            NO PRIMARY SENSOR SWATH LOADED
+          </div>
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '14px', maxWidth: '460px', margin: '0 auto 14px auto' }}>
+            Ingest an image in Primary Sensor Swath (Slot A) or load a calibrated Sentinel-2 multispectral benchmark swath to compute live scientific NDVI, NDWI, NDBI, CIR, NBR, and SAVI matrices.
+          </div>
+          {onLoadBenchmarkSwath && (
+            <button
+              onClick={onLoadBenchmarkSwath}
+              style={{
+                padding: '6px 16px',
+                background: 'var(--accent-amber)',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '6px',
+                fontFamily: 'var(--font-mono)',
+                fontSize: '11px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                boxShadow: '0 2px 6px rgba(194, 109, 46, 0.25)',
+              }}
+            >
+              INGEST SENTINEL-2 BENCHMARK SWATH
+            </button>
+          )}
+        </div>
       ) : (
-        <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px' }}>
+        <div style={{ padding: '28px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px' }}>
           {loading ? (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
               <div className="pulse-dot" />
-              <span>Synthesizing radiometric spectral band math matrix...</span>
+              <span style={{ fontFamily: 'var(--font-mono)' }}>Synthesizing calibrated {currentTab.label} radiometric band math matrix...</span>
+            </div>
+          ) : errorNotice ? (
+            <div style={{ color: '#e11d48', fontFamily: 'var(--font-mono)' }}>
+              <div>⚠️ {errorNotice}</div>
+              <button
+                onClick={() => calculateIndex(activeTab, true)}
+                style={{
+                  marginTop: '10px',
+                  padding: '4px 12px',
+                  background: '#e11d48',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontSize: '11px',
+                }}
+              >
+                RETRY COMPUTATION
+              </button>
             </div>
           ) : (
-            <span>Click any spectral index above (NDVI / NDWI / NDBI / CIR) to compute live multi-spectral radiometric analysis on Sensor A.</span>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+              <div className="pulse-dot" />
+              <span style={{ fontFamily: 'var(--font-mono)' }}>Preparing scientific radiometric indices...</span>
+            </div>
           )}
         </div>
       )}
