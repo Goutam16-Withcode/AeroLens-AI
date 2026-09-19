@@ -1,4 +1,4 @@
-"""SatQuery AI — FastAPI Backend Server for Next.js / React Frontend.
+"""AeroLens AI — FastAPI Backend Server for Next.js / React Frontend.
 
 Exposes REST APIs for:
 - 5-tool Agentic VLM inference (VQA, Captioning, Grounding, Change-VQA, Optical-SAR Fusion)
@@ -31,8 +31,8 @@ import app as agent_module
 import threading
 
 app = FastAPI(
-    title="SatQuery AI API",
-    description="Orbital Earth Observation & Agentic Vision-Language Intelligence API",
+    title="AeroLens AI API",
+    description="Autonomous Orbital Earth Observation & Agentic Vision-Language Intelligence API",
     version="2.0.0",
 )
 

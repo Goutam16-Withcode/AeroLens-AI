@@ -2,8 +2,8 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'SatQuery AI — Autonomous Multispectral Agentic VLM // Next.js + FastAPI Cockpit',
-  description: 'SatQuery AI is an autonomous multispectral agentic vision-language model cockpit for satellite observation, spectral band math, and bi-temporal change detection.',
+  title: 'AeroLens AI — Autonomous Orbital Earth Observation Cockpit',
+  description: 'AeroLens AI is an autonomous orbital Earth observation cockpit for satellite vision-language analysis, spectral band math, and bi-temporal change detection.',
 };
 
 export default function RootLayout({

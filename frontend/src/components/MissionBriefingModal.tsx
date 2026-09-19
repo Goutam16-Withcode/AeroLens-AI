@@ -47,7 +47,7 @@ export const MissionBriefingModal: React.FC<MissionBriefingModalProps> = ({
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid var(--border-subtle)', paddingBottom: '16px', marginBottom: '20px' }}>
           <div>
             <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--accent-amber)', letterSpacing: '0.12em', fontWeight: 700 }}>
-              NATIONAL REMOTE SENSING & GEOSPATIAL INTELLIGENCE // SATQUERY AI
+              NATIONAL REMOTE SENSING & GEOSPATIAL INTELLIGENCE // AEROLENS AI
             </div>
             <h2 style={{ fontFamily: 'var(--font-hud)', fontSize: '22px', fontWeight: 800, color: 'var(--text-pure)', margin: '4px 0' }}>
               ORBITAL MISSION INTELLIGENCE BRIEFING

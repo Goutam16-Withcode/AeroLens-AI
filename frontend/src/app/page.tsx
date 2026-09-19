@@ -539,7 +539,7 @@ export default function GroundStationPage() {
             letterSpacing: '0.06em',
           }}
         >
-          SATQUERY AI // AUTONOMOUS MULTISPECTRAL AGENTIC VLM // NEXT.JS + FASTAPI COCKPIT
+          AEROLENS AI // AUTONOMOUS ORBITAL EARTH OBSERVATION COCKPIT
         </footer>
       </main>
     </div>

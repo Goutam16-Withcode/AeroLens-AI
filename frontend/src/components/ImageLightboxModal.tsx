@@ -84,7 +84,7 @@ export const ImageLightboxModal: React.FC<ImageLightboxModalProps> = ({
     try {
       const link = document.createElement('a');
       link.href = imageSrc;
-      const cleanTitle = (title || 'satquery_frame').toLowerCase().replace(/[^a-z0-9]/g, '_');
+      const cleanTitle = (title || 'aerolens_frame').toLowerCase().replace(/[^a-z0-9]/g, '_');
       const ts = new Date().toISOString().replace(/[:.]/g, '-');
       link.download = `${cleanTitle}_${ts}.png`;
       document.body.appendChild(link);
@@ -385,7 +385,7 @@ export const ImageLightboxModal: React.FC<ImageLightboxModalProps> = ({
           </div>
 
           <div style={{ color: 'var(--accent-amber)', fontWeight: 600 }}>
-            SATQUERY RESOLUTION DECODER // LOSSLESS RENDER
+            AEROLENS RESOLUTION DECODER // LOSSLESS RENDER
           </div>
         </div>
       </div>

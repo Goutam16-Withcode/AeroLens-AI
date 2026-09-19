@@ -722,7 +722,7 @@ class AgentController:
     def _tool_vqa(self, model, processor, image, query):
         if _HAS_CLOUD_VLM and is_cloud_vlm_enabled():
             vqa_prompt = (
-                f"You are SatQuery AI, an authoritative senior aerospace remote sensing intelligence analyst and planetary scientist.\n\n"
+                f"You are AeroLens AI, an authoritative senior aerospace remote sensing intelligence analyst and planetary scientist.\n\n"
                 f"MISSION INQUIRY: '{query}'\n\n"
                 "Execute an exhaustive, high-depth scientific intelligence evaluation of this satellite imagery addressing the inquiry. "
                 "Provide a rigorous, publication-grade dossier structured into the following mandatory sections with quantitative tables and bold metrics:\n\n"
@@ -781,7 +781,7 @@ class AgentController:
         prompt_text = query.strip() if any(k in query.lower() for k in CAPTION_KEYWORDS) else CAPTION_PROMPT
         if _HAS_CLOUD_VLM and is_cloud_vlm_enabled():
             caption_prompt = (
-                f"You are SatQuery AI, an authoritative senior aerospace remote sensing intelligence analyst and planetary scientist.\n\n"
+                f"You are AeroLens AI, an authoritative senior aerospace remote sensing intelligence analyst and planetary scientist.\n\n"
                 f"MISSION INQUIRY: '{prompt_text}'\n\n"
                 "Conduct an exhaustive, high-depth scientific intelligence evaluation of this satellite imagery. "
                 "Structure your synthesized intelligence report with the following detailed technical sections, quantitative telemetry table, and deep domain analyses:\n\n"
@@ -899,7 +899,7 @@ class AgentController:
         }
         if _HAS_CLOUD_VLM and is_cloud_vlm_enabled():
             change_prompt = (
-                f"You are SatQuery AI, an authoritative bi-temporal satellite change detection and disaster analyst.\n\n"
+                f"You are AeroLens AI, an authoritative bi-temporal satellite change detection and disaster analyst.\n\n"
                 f"MISSION INQUIRY: '{query}'\n\n"
                 "Analyze these two co-registered satellite observations (T1 Baseline and T2 Post-Event). "
                 "Provide an exhaustive, high-depth damage and alteration assessment with quantitative tables and structured sections:\n\n"
@@ -939,7 +939,7 @@ class AgentController:
         }
         if _HAS_CLOUD_VLM and is_cloud_vlm_enabled():
             fusion_prompt = (
-                f"You are SatQuery AI, an authoritative optical-SAR multi-sensor satellite fusion analyst.\n\n"
+                f"You are AeroLens AI, an authoritative optical-SAR multi-sensor satellite fusion analyst.\n\n"
                 f"MISSION INQUIRY: '{query}'\n\n"
                 "Synthesize this dual-sensor pass uniting Optical Multispectral Reflectance (Sensor A) and C-band SAR Radar Backscatter (Sensor B) "
                 "into an exhaustive cross-modal intelligence briefing:\n\n"

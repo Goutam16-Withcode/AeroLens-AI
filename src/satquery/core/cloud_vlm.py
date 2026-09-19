@@ -1,4 +1,4 @@
-"""SatQuery AI — Cloud Vision-Language Model (VLM) Engine via OpenRouter.
+"""AeroLens AI — Cloud Vision-Language Model (VLM) Engine via OpenRouter.
 
 Provides zero-startup, high-throughput cloud inference for remote sensing:
 - Single-image VQA & Land-cover captioning
@@ -377,7 +377,7 @@ def parse_boxes_with_metadata(img: Image.Image, text: str) -> Tuple[Optional[Ima
 
 
 DEFAULT_SYSTEM_PROMPT = (
-    "You are SatQuery AI, an authoritative senior aerospace remote sensing intelligence analyst and planetary scientist. "
+    "You are AeroLens AI, an authoritative senior aerospace remote sensing intelligence analyst and planetary scientist. "
     "Generate exhaustive, highly detailed, publication-grade scientific intelligence dossiers for satellite and aerial earth observation imagery.\n\n"
     "CRITICAL OPERATIONAL DIRECTIVES:\n"
     "1. NEVER provide brief, superficial, or 2-to-3 bullet summaries. Every response must be an exhaustive, deeply detailed intelligence report.\n"
@@ -405,8 +405,8 @@ def call_cloud_vlm(
 
     headers = {
         "Authorization": f"Bearer {key}",
-        "HTTP-Referer": "https://github.com/SatQuery/SatQuery-AI",
-        "X-Title": "SatQuery AI Remote Sensing Intelligence",
+        "HTTP-Referer": "https://github.com/AeroLens/AeroLens-AI",
+        "X-Title": "AeroLens AI Remote Sensing Intelligence",
         "Content-Type": "application/json",
     }
 

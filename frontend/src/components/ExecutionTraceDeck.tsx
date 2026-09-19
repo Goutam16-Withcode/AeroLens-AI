@@ -14,7 +14,7 @@ export const ExecutionTraceDeck: React.FC<ExecutionTraceDeckProps> = ({ trace, f
   const downloadReport = () => {
     if (!fullResponse) return;
     const reportData = {
-      app: 'SatQuery AI Autonomous Mission Intelligence',
+      app: 'AeroLens AI Autonomous Mission Intelligence',
       version: '2.0.0-PRO',
       timestamp: new Date().toISOString(),
       analysis: fullResponse.answer,
@@ -24,7 +24,7 @@ export const ExecutionTraceDeck: React.FC<ExecutionTraceDeckProps> = ({ trace, f
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `satquery_mission_${Date.now()}.json`;
+    a.download = `aerolens_mission_${Date.now()}.json`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);

@@ -327,7 +327,7 @@ export const SpectralIndicesDeck: React.FC<SpectralIndicesDeckProps> = ({ fileA,
     if (!processedImg) return;
     const a = document.createElement('a');
     a.href = processedImg;
-    a.download = `satquery-${activeTab}-spectral-map.png`;
+    a.download = `aerolens-${activeTab}-spectral-map.png`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
