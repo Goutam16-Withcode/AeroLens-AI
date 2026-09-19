@@ -1,5 +1,5 @@
 ---
-title: AeroLens AI — Autonomous Orbital Earth Observation & Remote Sensing Cockpit
+title: SATQUERY AI // AUTONOMOUS MULTISPECTRAL AGENTIC VLM // NEXT.JS + FASTAPI COCKPIT
 emoji: 🛰️
 colorFrom: blue
 colorTo: indigo
@@ -8,7 +8,7 @@ app_port: 3000
 pinned: false
 ---
 
-# 🛰️ AeroLens AI — Autonomous Orbital Earth Observation Cockpit
+# 🛰️ SATQUERY AI // AUTONOMOUS MULTISPECTRAL AGENTIC VLM // NEXT.JS + FASTAPI COCKPIT
 
 [![Next.js 15](https://img.shields.io/badge/Next.js-15%20Turbopack-black?logo=next.js&logoColor=white)](https://nextjs.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.110%2B-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
@@ -16,15 +16,15 @@ pinned: false
 [![Docker Ready](https://img.shields.io/badge/Docker-Containerized-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**AeroLens AI** is an advanced aerospace ground station cockpit and multimodal remote sensing intelligence copilot. Built for mission-critical satellite earth observation, bi-temporal disaster monitoring, and multi-sensor intelligence, it fuses state-of-the-art **Vision-Language Models (VLMs)**, **USGS/NASA scientific spectral band math**, and an aerospace-grade **Next.js + FastAPI** architecture.
+**SATQUERY AI** is an advanced aerospace ground station cockpit and autonomous multimodal remote sensing agentic platform. Built for mission-critical satellite earth observation, bi-temporal disaster monitoring, and multi-sensor intelligence, it unites state-of-the-art **Vision-Language Models (VLMs)**, **USGS & NASA scientific spectral band math**, and a high-performance **Next.js 15 + FastAPI** architecture.
 
 ---
 
-## 🌟 Mission Cockpit Modules
+## 🌟 Ground Station Cockpit Modules
 
 ```
  ┌────────────────────────────────────────────────────────────────────────────────────────┐
- │                                   AEROLENS AI COCKPIT                                  │
+ │                                   SATQUERY AI COCKPIT                                  │
  ├───────────────────┬───────────────────┬────────────────────┬───────────────────────────┤
  │ [01] EVIDENCE     │ [02] BAND MATH    │ [03] COMPARISON    │ [04] 3X LOUPE & CLAHE     │
  │ 4-Slot Multi-     │ NDVI, NDWI, NDBI, │ Bi-temporal swipe, │ Multi-scale (2X/4X/8X),   │
@@ -108,7 +108,7 @@ python -m venv venv
 .\venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 
-# Start the AeroLens AI API server
+# Start the SatQuery AI API server
 uvicorn src.satquery.api.server:app --host 0.0.0.0 --port 8000 --reload
 ```
 
@@ -118,7 +118,7 @@ python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 
-# Start the AeroLens AI API server
+# Start the SatQuery AI API server
 uvicorn src.satquery.api.server:app --host 0.0.0.0 --port 8000 --reload
 ```
 
@@ -142,7 +142,7 @@ Open your browser and navigate to **`http://localhost:3000`**.
 
 ## 🐳 Docker & Container Orchestration
 
-Run the complete AeroLens AI cockpit with a single command:
+Run the complete SatQuery AI cockpit with a single command:
 
 ```bash
 docker compose up -d --build
@@ -173,7 +173,7 @@ docker compose down
 ## 📁 Repository Structure
 
 ```
-AeroLens-AI/
+SatQuery-AI/
 ├── app.py                      # Multi-tool Agent Controller & single-image evidence synthesizer
 ├── src/
 │   └── satquery/
@@ -221,4 +221,4 @@ pytest tests/ -v
 
 ## 📄 License
 
-AeroLens AI is open-source software licensed under the [MIT License](LICENSE).
+SatQuery AI is open-source software licensed under the [MIT License](LICENSE).

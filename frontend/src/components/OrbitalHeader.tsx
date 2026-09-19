@@ -54,10 +54,10 @@ export const OrbitalHeader: React.FC<OrbitalHeaderProps> = ({ status: propStatus
         </div>
         <div>
           <div className="brand-title">
-            AERO<span>LENS</span> AI
+            SAT<span>QUERY</span> AI
           </div>
           <div className="brand-subtitle">
-            AUTONOMOUS ORBITAL EARTH OBSERVATION // 5-TOOL AGENTIC VLM
+            AUTONOMOUS MULTISPECTRAL AGENTIC VLM // NEXT.JS + FASTAPI COCKPIT
           </div>
         </div>
       </div>
