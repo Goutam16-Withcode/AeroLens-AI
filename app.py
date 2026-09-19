@@ -63,8 +63,9 @@ MODEL_ID = "Qwen/Qwen3-VL-4B-Instruct"
 ADAPTER_DIR = os.environ.get("SATQUERY_LORA_ADAPTER", "adapters/bigearthnet-lora")
 
 CAPTION_PROMPT = (
-    "Describe the land cover, major objects, and overall scene composition "
-    "visible in this remote sensing image in 2-4 sentences."
+    "Execute an exhaustive, high-depth scientific intelligence evaluation of this satellite imagery: "
+    "synthesize orbital platform telemetry, radiometric channel physics, cloud microphysics and convective "
+    "storm inventory, terrestrial geomorphology and hydrology, and tactical operational hazard advisories."
 )
 
 FUSION_PROMPT_PREFIX = (

@@ -1,0 +1,70 @@
+# SATQUERY AI — Intelligence Report: Scene Analysis
+
+## 1. Image Metadata & Acquisition Assessment
+
+| Parameter | Value |
+|-----------|-------|
+| **Image Dimensions** | 512 × 512 px (estimated) |
+| **Color Depth** | 24-bit RGB |
+| **Scene Complexity** | Minimal (2 distinct elements) |
+| **Image Classification** | Synthetic / Test Pattern |
+| **Estimated Resolution** | Indeterminate — no georeferencing available |
+
+---
+
+## 2. Spectral & Color Analysis
+
+### 2.1 Background Surface
+- **Dominant Color**: Uniform tan/khaki (approx. RGB 190, 155, 110; HEX ~#BE9B6E)
+- **Spectral Interpretation**: In a remote sensing context, this tone is consistent with:
+  - **Barren/arid terrain** in visible bands (B2-Green: ~0.5 µm, B3-Red: ~0.65 µm, B4-NIR: ~0.85 µm)
+  - **Desert sand** or **exposed dry soil** with low vegetation index (NDVI ≈ 0.05–0.15)
+  - **No textural variance** detected — no specular features, no shadow casting, no micro-topography
+- **Uniformity Assessment**: The complete absence of spatial variance in the background is atypical of any real-world earth surface at operational satellite resolution. Natural terrain at even moderate resolution (e.g., Landsat 30m, Sentinel-2 10m) would exhibit grain, tonal variation, or patch structure.
+
+### 2.2 Linear Feature
+- **Geometry**: Perfectly straight diagonal line, traversing from upper-left (NW) to lower-right (SE) corner
+- **Azimuth/Bearing**: Approximately **135°** (SE direction) or equivalently **315°** (NW-SE axis)
+- **Pixel Width**: ~3–5 px (consistent, no tapering)
+- **Color**: Dark charcoal gray (approx. RGB 60, 60, 60)
+- **Contrast Ratio**: ~130:1 against background (high contrast)
+- **Linearity Index**: 1.000 (perfectly linear — no curvature, no displacement, no jitter)
+
+---
+
+## 3. Hypothetical Feature Interpretation
+
+### 3.1 If Interpreted as Satellite Imagery
+
+**Scenario A — Arid Zone with Linear Infrastructure**
+The background could hypothetically represent a **desert or semi-arid landscape** (e.g., Sahara, Arabian, Gobi, Atacama). The diagonal line could correspond to:
+
+| Feature Type | Probability | Supporting Evidence | Contradicting Evidence |
+|-------------|-------------|-------------------|----------------------|
+| **Road/Track** | Moderate | Linear, uniform width | No shoulders, no culverts, no intersections |
+| **Runway** | Low | Straight, high contrast | Wrong proportions (too narrow for aircraft operations) |
+| **Canal/Channel** | Low | Linear, distinct boundary | No water signature, no vegetation corridor |
+| **Fault Line** | Very Low | Linear geometry | Too uniform, no offset, no associated geomorphology |
+| **Power Line Corridor** | Low | Linear, cleared path | No tower signatures visible |
+| **Test/Synthetic Artifact** | **Very High** | Perfect geometry, zero noise | N/A — this IS the correct interpretation |
+
+**Scenario B — SAR Imagery (False Color)**
+In a SAR context (e.g., Sentinel-1 C-band HH polarization), a uniform background would indicate:
+- **Specular surface** (calm water) — but tan is not a typical false-color water tone
+- **Smooth terrain** — but no speckle noise would be present (speckle is intrinsic to SAR)
+- The line could represent a **strong specular reflector** or **man-made structure** with coherent return
+
+**Assessment**: The image lacks all hallmarks of real remote sensing data — no noise, no atmospheric artifacts, no sensor banding, no geospatial context, no projection metadata.
+
+---
+
+## 4. Image Quality & Integrity Assessment
+
+| Quality Metric | Rating | Notes |
+|---------------|--------|-------|
+| **Signal-to-Noise Ratio** | N/A | No noise detected (suspicious) |
+| **Spatial Resolution** | Indeterminate | No ground sample distance determinable |
+| **Radiometric Calibration** | Not calibrated | No DN-to-reflectance conversion possible |
+| **Geometric Distortion** | None detected | Perfectly rectified (or synthetic) |
+| **Cloud Cover** | 0% | No clouds or atmospheric effects |
+| **Temporal Information**
