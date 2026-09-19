@@ -111,15 +111,16 @@ export const ImageLightboxModal: React.FC<ImageLightboxModalProps> = ({
       <div
         className="image-modal-content"
         style={{
-          maxWidth: '96vw',
-          maxHeight: '94vh',
-          width: '100%',
+          maxWidth: 'min(92vw, 960px)',
+          maxHeight: '90vh',
+          width: 'auto',
+          margin: '0 auto',
           display: 'flex',
           flexDirection: 'column',
           background: '#1c1917',
-          border: '1px solid rgba(255, 255, 255, 0.15)',
+          border: '1.5px solid rgba(255, 255, 255, 0.18)',
           borderRadius: '12px',
-          boxShadow: '0 25px 60px rgba(0, 0, 0, 0.65)',
+          boxShadow: '0 25px 70px rgba(0, 0, 0, 0.75)',
           padding: '0',
           overflow: 'hidden',
           color: '#ffffff',
@@ -311,8 +312,9 @@ export const ImageLightboxModal: React.FC<ImageLightboxModalProps> = ({
         <div
           ref={containerRef}
           style={{
-            flex: 1,
-            height: '75vh',
+            minHeight: '400px',
+            maxHeight: '72vh',
+            minWidth: 'min(90vw, 480px)',
             overflow: 'hidden',
             position: 'relative',
             background: '#0c0a09',
@@ -321,6 +323,7 @@ export const ImageLightboxModal: React.FC<ImageLightboxModalProps> = ({
             justifyContent: 'center',
             cursor: scale > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default',
             userSelect: 'none',
+            padding: '18px',
           }}
           onWheel={handleWheel}
           onMouseDown={handleMouseDown}
@@ -335,7 +338,7 @@ export const ImageLightboxModal: React.FC<ImageLightboxModalProps> = ({
               inset: 0,
               backgroundImage:
                 'linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px)',
-              backgroundSize: '32px 32px',
+              backgroundSize: '24px 24px',
               pointerEvents: 'none',
             }}
           />
@@ -345,13 +348,16 @@ export const ImageLightboxModal: React.FC<ImageLightboxModalProps> = ({
             alt={title}
             draggable={false}
             style={{
-              maxWidth: '100%',
-              maxHeight: '100%',
+              maxWidth: '85vw',
+              maxHeight: '66vh',
+              width: 'auto',
+              height: 'auto',
               objectFit: 'contain',
               transform: `translate(${pos.x}px, ${pos.y}px) scale(${scale})`,
               transition: isDragging ? 'none' : 'transform 0.12s ease-out',
               transformOrigin: 'center center',
-              boxShadow: '0 10px 40px rgba(0,0,0,0.5)',
+              boxShadow: '0 10px 40px rgba(0,0,0,0.6)',
+              borderRadius: '4px',
             }}
           />
         </div>

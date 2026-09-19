@@ -521,9 +521,7 @@ def classify_task(query: str, num_images: int, modalities: List[str]) -> Task:
     q = query.lower()
     if num_images == 2:
         mods = {m.lower() for m in modalities if m}
-        if mods == {"optical", "sar"}:
-            if any(k in q for k in CHANGE_KEYWORDS) and not any(k in q for k in FUSION_KEYWORDS):
-                return Task.CHANGE_VQA
+        if mods == {"optical", "sar"} or "sar" in mods or any(k in q for k in FUSION_KEYWORDS):
             return Task.OPTICAL_SAR_FUSION
         return Task.CHANGE_VQA
     if any(k in q for k in GROUNDING_KEYWORDS):

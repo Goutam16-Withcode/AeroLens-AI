@@ -73,6 +73,62 @@ export default function GroundStationPage() {
     }
   };
 
+  const handleSelectPreset = async (presetId: string, prompt: string) => {
+    setQuery(prompt);
+
+    // Fetch examples if needed to auto-load matching dataset pairs
+    let examples: BenchmarkMission[] = [];
+    try {
+      const r = await fetch('http://localhost:8000/api/examples');
+      if (r.ok) {
+        const d = await r.json();
+        examples = d.examples || [];
+      }
+    } catch {
+      // ignore
+    }
+
+    if (presetId === 'sar_fusion') {
+      setModalityA('Optical');
+      setModalityB('SAR');
+      setActiveTab('matrix');
+      const fusionMission = examples.find((e) => e.id === 'bigearthnet_fusion' || e.category.includes('Fusion'));
+      if (fusionMission && (!previewB || modalityB !== 'SAR')) {
+        handleSelectMission(fusionMission);
+      }
+    } else if (presetId === 'bitemporal') {
+      setModalityA('Optical');
+      setModalityB('Optical');
+      setActiveTab('swipe');
+      const cdMission = examples.find((e) => e.id.includes('flood') || e.id.includes('cdvqa') || e.category.includes('Disaster') || e.category.includes('Bi-Temporal'));
+      if (cdMission && !previewB) {
+        handleSelectMission(cdMission);
+      }
+    } else if (presetId === 'multi_detect') {
+      setModalityA('Optical');
+      setActiveTab('objects');
+      if (!previewA) {
+        const vrsMission = examples.find((e) => e.id.includes('vrsbench'));
+        if (vrsMission) handleSelectMission(vrsMission);
+      }
+    } else if (presetId === 'grounding') {
+      setModalityA('Optical');
+      setActiveTab('matrix');
+      if (!previewA) {
+        const vrsMission = examples.find((e) => e.id.includes('vrsbench'));
+        if (vrsMission) handleSelectMission(vrsMission);
+      }
+    } else if (presetId === 'vqa') {
+      setActiveTab('matrix');
+      if (!previewA) {
+        const rsvqaMission = examples.find((e) => e.id.includes('rsvqa'));
+        if (rsvqaMission) handleSelectMission(rsvqaMission);
+      }
+    } else if (presetId === 'caption') {
+      setActiveTab('matrix');
+    }
+  };
+
   const handleTransmit = async () => {
     if (!fileA && !previewA) {
       setErrorMessage('Telemetry Alert: Primary sensor swath (Image A) is required.');
@@ -240,6 +296,7 @@ export default function GroundStationPage() {
               setQuery={setQuery}
               onTransmit={handleTransmit}
               isLoading={isLoading}
+              onSelectPreset={handleSelectPreset}
             />
 
             <SatelliteOrbitRadar />

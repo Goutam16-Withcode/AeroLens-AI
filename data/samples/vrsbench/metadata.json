@@ -1,0 +1,46 @@
+{
+  "dataset": "VRSBench",
+  "title": "Airfield & Infrastructure Grounding",
+  "samples": [
+    {
+      "id": 1,
+      "filename": "vrsbench_sample_01.png",
+      "caption": "An airfield with a north-south asphalt runway, aircraft apron, parked airplanes, and fuel tanks.",
+      "preset_queries": [
+        "Locate and highlight all parked airplanes on the apron.",
+        "Where are the circular fuel storage tanks positioned relative to the runway?",
+        "Describe the overall airfield layout and surrounding land cover."
+      ],
+      "ground_truth_bboxes": [
+        {
+          "label": "airplane",
+          "ymin": 0.44,
+          "xmin": 0.46,
+          "ymax": 0.54,
+          "xmax": 0.56
+        },
+        {
+          "label": "airplane",
+          "ymin": 0.44,
+          "xmin": 0.62,
+          "ymax": 0.54,
+          "xmax": 0.71
+        },
+        {
+          "label": "storage_tank",
+          "ymin": 0.11,
+          "xmin": 0.66,
+          "ymax": 0.24,
+          "xmax": 0.78
+        },
+        {
+          "label": "storage_tank",
+          "ymin": 0.11,
+          "xmin": 0.82,
+          "ymax": 0.24,
+          "xmax": 0.94
+        }
+      ]
+    }
+  ]
+}

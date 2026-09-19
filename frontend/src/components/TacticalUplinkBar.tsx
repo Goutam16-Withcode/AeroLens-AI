@@ -2,11 +2,23 @@
 
 import React from 'react';
 
+export interface PresetChip {
+  id: string;
+  label: string;
+  prompt: string;
+  badge: string;
+  modalityA?: string;
+  modalityB?: string;
+  reqSecondImage?: boolean;
+  icon: React.ReactNode;
+}
+
 interface TacticalUplinkBarProps {
   query: string;
   setQuery: (q: string) => void;
   onTransmit: () => void;
   isLoading: boolean;
+  onSelectPreset?: (presetId: string, prompt: string) => void;
 }
 
 export const TacticalUplinkBar: React.FC<TacticalUplinkBarProps> = ({
@@ -14,12 +26,16 @@ export const TacticalUplinkBar: React.FC<TacticalUplinkBarProps> = ({
   setQuery,
   onTransmit,
   isLoading,
+  onSelectPreset,
 }) => {
-  const chips = [
+  const chips: PresetChip[] = [
     {
       id: 'vqa',
       label: 'VQA Scene Inquiry',
+      badge: '1x OPTICAL',
       prompt: 'Is a residential building present in this scene?',
+      modalityA: 'Optical',
+      reqSecondImage: false,
       icon: (
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <circle cx="11" cy="11" r="8" />
@@ -30,7 +46,10 @@ export const TacticalUplinkBar: React.FC<TacticalUplinkBarProps> = ({
     {
       id: 'caption',
       label: 'Land-Cover Caption',
+      badge: '1x SCENE',
       prompt: 'Describe the land cover, major objects, and overall scene composition in this remote sensing image.',
+      modalityA: 'Optical',
+      reqSecondImage: false,
       icon: (
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <polygon points="12 2 2 7 12 12 22 7 12 2" />
@@ -42,7 +61,10 @@ export const TacticalUplinkBar: React.FC<TacticalUplinkBarProps> = ({
     {
       id: 'grounding',
       label: 'Target Grounding',
+      badge: 'RETICLE',
       prompt: 'Locate and highlight all parked airplanes with a bounding box.',
+      modalityA: 'Optical',
+      reqSecondImage: false,
       icon: (
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <path d="M4 8V4m0 0h4M4 4l5 5m11-5h-4m4 0v4m0-4l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
@@ -52,7 +74,10 @@ export const TacticalUplinkBar: React.FC<TacticalUplinkBarProps> = ({
     {
       id: 'multi_detect',
       label: 'Multi-Object Detection',
+      badge: 'MULTI-OBJ',
       prompt: 'Detect and identify all different objects in this image with high-accuracy bounding boxes and labels.',
+      modalityA: 'Optical',
+      reqSecondImage: false,
       icon: (
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <rect x="3" y="3" width="7" height="7" rx="1" />
@@ -65,7 +90,11 @@ export const TacticalUplinkBar: React.FC<TacticalUplinkBarProps> = ({
     {
       id: 'bitemporal',
       label: 'Bi-Temporal Delta',
+      badge: '2x TEMPORAL',
       prompt: 'What structural and land-cover changes occurred between these two observation dates?',
+      modalityA: 'Optical',
+      modalityB: 'Optical',
+      reqSecondImage: true,
       icon: (
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <circle cx="12" cy="12" r="10" />
@@ -76,7 +105,11 @@ export const TacticalUplinkBar: React.FC<TacticalUplinkBarProps> = ({
     {
       id: 'sar_fusion',
       label: 'Optical-SAR Fusion',
-      prompt: 'Use both the optical and SAR images together to identify water boundaries and built-up areas beneath clouds.',
+      badge: 'S2+S1 DUAL',
+      prompt: 'Use both the optical and SAR images together to identify water boundaries beneath cloud cover.',
+      modalityA: 'Optical',
+      modalityB: 'SAR',
+      reqSecondImage: true,
       icon: (
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
@@ -84,6 +117,13 @@ export const TacticalUplinkBar: React.FC<TacticalUplinkBarProps> = ({
       ),
     },
   ];
+
+  const handleChipClick = (chip: PresetChip) => {
+    setQuery(chip.prompt);
+    if (onSelectPreset) {
+      onSelectPreset(chip.id, chip.prompt);
+    }
+  };
 
   return (
     <div className="panel-card">
@@ -95,20 +135,43 @@ export const TacticalUplinkBar: React.FC<TacticalUplinkBarProps> = ({
           </svg>
           <span>MISSION OBJECTIVE UPLINK</span>
         </div>
-        <span className="panel-title-tag">TOOL PRESETS</span>
+        <span className="panel-title-tag">INTELLIGENT TOOL PRESETS</span>
       </div>
 
       <div className="preset-chips-container">
-        {chips.map((chip) => (
-          <button
-            key={chip.id}
-            className={`preset-chip ${query === chip.prompt ? 'active-chip' : ''}`}
-            onClick={() => setQuery(chip.prompt)}
-          >
-            {chip.icon}
-            <span>{chip.label}</span>
-          </button>
-        ))}
+        {chips.map((chip) => {
+          const isActive = query === chip.prompt;
+          return (
+            <button
+              key={chip.id}
+              className={`preset-chip ${isActive ? 'active-chip' : ''}`}
+              onClick={() => handleChipClick(chip)}
+              title={chip.prompt}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '6px 10px',
+              }}
+            >
+              {chip.icon}
+              <span>{chip.label}</span>
+              <span
+                style={{
+                  fontSize: '8.5px',
+                  fontWeight: 800,
+                  padding: '1px 4px',
+                  borderRadius: '3px',
+                  background: isActive ? 'var(--accent-amber)' : 'rgba(0,0,0,0.06)',
+                  color: isActive ? '#ffffff' : 'var(--text-muted)',
+                  letterSpacing: '0.5px',
+                }}
+              >
+                {chip.badge}
+              </span>
+            </button>
+          );
+        })}
       </div>
 
       <div className="query-box-wrap">

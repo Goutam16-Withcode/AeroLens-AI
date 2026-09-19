@@ -95,6 +95,12 @@ def get_examples():
     examples = []
     
     # Check sample files
+    try:
+        from satquery.core.samples import ensure_sample_imagery
+        ensure_sample_imagery()
+    except Exception as e:
+        print(f"[samples] ensure_sample_imagery notice: {e}")
+
     candidates = [
         {
             "id": "vrsbench_airfield",
@@ -105,7 +111,7 @@ def get_examples():
             "modality_a": "Optical",
             "image_b": None,
             "modality_b": "Auto",
-            "query": "Locate and highlight all parked airplanes on the apron.",
+            "query": "Locate and highlight all parked airplanes with a bounding box.",
         },
         {
             "id": "rsvqa_landuse",
@@ -119,26 +125,15 @@ def get_examples():
             "query": "Is a residential building present in this scene?",
         },
         {
-            "id": "cdvqa_tsunami",
-            "title": "Palu Tsunami Coastal Inundation",
+            "id": "cdvqa_flood",
+            "title": "Coastal & River Basin Flood Inundation",
             "category": "Bi-Temporal Disaster",
             "mission_tag": "DISASTER CHARTER #581",
-            "image_a": "disaster_examples/tsunami_before.tiff",
+            "image_a": "data/samples/disaster/flood_before.png",
             "modality_a": "Optical",
-            "image_b": "disaster_examples/tsunami_after.tiff",
+            "image_b": "data/samples/disaster/flood_after.png",
             "modality_b": "Optical",
-            "query": "Describe the coastal inundation and structural damage caused by the tsunami.",
-        },
-        {
-            "id": "cdvqa_landslide",
-            "title": "Mountain Slope Landslide",
-            "category": "Bi-Temporal Disaster",
-            "mission_tag": "DISASTER CHARTER #614",
-            "image_a": "disaster_examples/landslide_before.tiff",
-            "modality_a": "Optical",
-            "image_b": "disaster_examples/landslide_after.tiff",
-            "modality_b": "Optical",
-            "query": "Describe what changed on the mountain slope between these two temporal images.",
+            "query": "What structural and land-cover changes occurred between these two observation dates?",
         },
         {
             "id": "bigearthnet_fusion",

@@ -1,0 +1,15 @@
+{
+  "dataset": "RSVQA",
+  "title": "Land Cover & Infrastructure Counting",
+  "samples": [
+    {
+      "id": 1,
+      "filename": "rsvqa_sample_01.png",
+      "preset_queries": [
+        "What types of land use are visible in this scene?",
+        "How many residential buildings are clustered in the northeast quadrant?",
+        "Is there a natural water body dividing the landscape?"
+      ]
+    }
+  ]
+}
