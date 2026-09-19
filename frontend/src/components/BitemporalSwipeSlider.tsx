@@ -17,7 +17,24 @@ export const BitemporalSwipeSlider: React.FC<BitemporalSwipeSliderProps> = ({
 }) => {
   const [sliderPos, setSliderPos] = useState<number>(50);
   const [isDragging, setIsDragging] = useState<boolean>(false);
+  const [comparisonMode, setComparisonMode] = useState<'split' | 'blink' | 'dissolve'>('split');
+  const [dissolveOpacity, setDissolveOpacity] = useState<number>(50);
+  
+  // Blink Comparator State
+  const [blinkActive, setBlinkActive] = useState<boolean>(false);
+  const [blinkSpeedHz, setBlinkSpeedHz] = useState<number>(2); // 1, 2, or 4 Hz
+  const [blinkFrame, setBlinkFrame] = useState<'T1' | 'T2'>('T1');
+
   const containerRef = useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    if (comparisonMode !== 'blink' || !blinkActive) return;
+    const intervalMs = 1000 / blinkSpeedHz;
+    const timer = setInterval(() => {
+      setBlinkFrame((prev) => (prev === 'T1' ? 'T2' : 'T1'));
+    }, intervalMs);
+    return () => clearInterval(timer);
+  }, [comparisonMode, blinkActive, blinkSpeedHz]);
 
   const handleMove = (clientX: number) => {
     if (!containerRef.current) return;
@@ -40,9 +57,121 @@ export const BitemporalSwipeSlider: React.FC<BitemporalSwipeSliderProps> = ({
             <line x1="15" y1="15" x2="21" y2="21" />
             <line x1="4" y1="4" x2="9" y2="9" />
           </svg>
-          <span>INTERACTIVE BI-TEMPORAL COMPARISON SLIDER</span>
+          <span>BI-TEMPORAL RECONNAISSANCE & CHANGE DETECTION</span>
         </div>
-        <span className="panel-title-tag">DRAG TO REVEAL</span>
+        <span className="panel-title-tag">ASTRONOMICAL BLINK COMPARATOR</span>
+      </div>
+
+      {/* Mode Selector Toolbar */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '8px',
+          background: '#f8f4ec',
+          padding: '8px 12px',
+          borderRadius: '6px',
+          marginBottom: '12px',
+          border: '1px solid var(--border-subtle)',
+          fontFamily: 'var(--font-mono)',
+          fontSize: '11px',
+        }}
+      >
+        <div style={{ display: 'flex', gap: '4px' }}>
+          {(['split', 'blink', 'dissolve'] as const).map((m) => (
+            <button
+              key={m}
+              onClick={() => {
+                setComparisonMode(m);
+                if (m === 'blink') setBlinkActive(true);
+              }}
+              style={{
+                padding: '5px 10px',
+                background: comparisonMode === m ? 'var(--accent-amber)' : '#ffffff',
+                border: `1px solid ${comparisonMode === m ? 'var(--accent-amber)' : 'var(--border-subtle)'}`,
+                color: comparisonMode === m ? '#ffffff' : 'var(--text-secondary)',
+                borderRadius: '4px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                textTransform: 'uppercase',
+                fontSize: '10px',
+              }}
+            >
+              {m === 'split' ? 'SPLIT CURTAIN' : m === 'blink' ? 'BLINK COMPARATOR' : 'DISSOLVE FADE'}
+            </button>
+          ))}
+        </div>
+
+        {comparisonMode === 'blink' && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <button
+              onClick={() => setBlinkActive(!blinkActive)}
+              style={{
+                padding: '4px 8px',
+                background: blinkActive ? 'var(--accent-emerald-subtle)' : '#ffffff',
+                border: `1px solid ${blinkActive ? 'var(--accent-emerald)' : 'var(--border-subtle)'}`,
+                color: blinkActive ? 'var(--accent-emerald)' : 'var(--text-secondary)',
+                borderRadius: '4px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                fontSize: '10px',
+              }}
+            >
+              {blinkActive ? '■ PAUSE' : '▶ RUN BLINK'}
+            </button>
+
+            <div style={{ display: 'flex', gap: '2px' }}>
+              {[1, 2, 4].map((hz) => (
+                <button
+                  key={hz}
+                  onClick={() => setBlinkSpeedHz(hz)}
+                  style={{
+                    padding: '3px 6px',
+                    background: blinkSpeedHz === hz ? 'var(--accent-amber)' : '#ffffff',
+                    border: `1px solid ${blinkSpeedHz === hz ? 'var(--accent-amber)' : 'var(--border-subtle)'}`,
+                    color: blinkSpeedHz === hz ? '#ffffff' : 'var(--text-secondary)',
+                    borderRadius: '3px',
+                    fontSize: '9.5px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                >
+                  {hz}Hz
+                </button>
+              ))}
+            </div>
+
+            <span
+              style={{
+                padding: '2px 6px',
+                background: blinkFrame === 'T1' ? 'rgba(194, 109, 46, 0.2)' : 'rgba(190, 18, 60, 0.2)',
+                color: blinkFrame === 'T1' ? 'var(--accent-amber)' : '#be123c',
+                borderRadius: '3px',
+                fontWeight: 800,
+                fontSize: '10px',
+              }}
+            >
+              VIEWING: {blinkFrame}
+            </span>
+          </div>
+        )}
+
+        {comparisonMode === 'dissolve' && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, maxWidth: '280px' }}>
+            <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>T1 (0%)</span>
+            <input
+              type="range"
+              min="0"
+              max="100"
+              value={dissolveOpacity}
+              onChange={(e) => setDissolveOpacity(Number(e.target.value))}
+              style={{ flex: 1, accentColor: 'var(--accent-amber)', cursor: 'pointer' }}
+            />
+            <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>T2 (100%)</span>
+          </div>
+        )}
       </div>
 
       {imageBefore && imageAfter ? (

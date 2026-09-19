@@ -99,9 +99,41 @@ export const SpectralIndicesDeck: React.FC<SpectralIndicesDeckProps> = ({ fileA,
       ],
       gradient: 'linear-gradient(90deg, #0f172a 0%, #0e7490 25%, #94a3b8 50%, #f87171 75%, #dc2626 100%)',
     },
+    {
+      id: 'nbr',
+      label: 'NBR (Burn / Wildfire Severity)',
+      sub: 'USGS Fire Perimeter',
+      legend: [
+        { label: 'High Severity Burn', color: '#e11d48' },
+        { label: 'Moderate Scorch', color: '#d97706' },
+        { label: 'Unburned Canopy', color: '#10b981' },
+      ],
+      gradient: 'linear-gradient(90deg, #e11d48 0%, #f59e0b 45%, #10b981 100%)',
+    },
+    {
+      id: 'savi',
+      label: 'SAVI (Soil-Adjusted Vegetation)',
+      sub: 'Arid Canopy (L=0.5)',
+      legend: [
+        { label: 'Bare Arid Soil', color: '#78716c' },
+        { label: 'Sparse Vegetation', color: '#a3e635' },
+        { label: 'Dense Canopy', color: '#059669' },
+      ],
+      gradient: 'linear-gradient(90deg, #78716c 0%, #a3e635 50%, #059669 100%)',
+    },
   ];
 
   const currentTab = tabs.find((t) => t.id === activeTab) || tabs[0];
+
+  const handleDownload = () => {
+    if (!processedImg) return;
+    const a = document.createElement('a');
+    a.href = processedImg;
+    a.download = `satquery-${activeTab}-spectral-map.png`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
 
   return (
     <div className="panel-card" style={{ marginBottom: '18px' }}>
@@ -320,6 +352,64 @@ export const SpectralIndicesDeck: React.FC<SpectralIndicesDeckProps> = ({ fileA,
                   {blendOpacity}%
                 </span>
               </div>
+
+              {/* Tactical Quick Actions */}
+              <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                <button
+                  onClick={() => setLightboxOpen(true)}
+                  style={{
+                    flex: 1,
+                    padding: '7px 10px',
+                    background: '#ffffff',
+                    border: '1px solid var(--border-subtle)',
+                    borderRadius: '6px',
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: '10.5px',
+                    fontWeight: 700,
+                    color: 'var(--text-primary)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                  }}
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <circle cx="11" cy="11" r="8" />
+                    <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                  </svg>
+                  <span>EXPAND LIGHTBOX</span>
+                </button>
+
+                <button
+                  onClick={handleDownload}
+                  style={{
+                    flex: 1,
+                    padding: '7px 10px',
+                    background: 'var(--accent-amber-subtle)',
+                    border: '1px solid var(--accent-amber-border)',
+                    borderRadius: '6px',
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: '10.5px',
+                    fontWeight: 700,
+                    color: 'var(--accent-amber)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    boxShadow: '0 1px 3px rgba(217, 119, 6, 0.1)',
+                  }}
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="7 10 12 15 17 10" />
+                    <line x1="12" y1="15" x2="12" y2="3" />
+                  </svg>
+                  <span>EXPORT PNG MAP</span>
+                </button>
+              </div>
             </div>
 
             {/* Scientific Quantitative Analysis Panel */}
@@ -366,6 +456,42 @@ export const SpectralIndicesDeck: React.FC<SpectralIndicesDeckProps> = ({ fileA,
                   <span style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>Vegetation Biomass:</span>
                   <strong style={{ color: 'var(--accent-emerald)', fontFamily: 'var(--font-mono)', fontSize: '12px' }}>
                     {stats.vegetation_coverage_pct}%
+                  </strong>
+                </div>
+              )}
+
+              {stats?.burn_classification && (
+                <div style={{ marginBottom: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>Fire Severity Regime:</span>
+                  <strong style={{ color: '#e11d48', fontFamily: 'var(--font-mono)', fontSize: '11.5px' }}>
+                    {stats.burn_classification}
+                  </strong>
+                </div>
+              )}
+
+              {stats?.burned_area_pct !== undefined && (
+                <div style={{ marginBottom: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>Burn Scar Footprint:</span>
+                  <strong style={{ color: '#e11d48', fontFamily: 'var(--font-mono)', fontSize: '12px' }}>
+                    {stats.burned_area_pct}%
+                  </strong>
+                </div>
+              )}
+
+              {stats?.classification && (
+                <div style={{ marginBottom: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>Soil-Adjusted Regime:</span>
+                  <strong style={{ color: '#10b981', fontFamily: 'var(--font-mono)', fontSize: '11.5px' }}>
+                    {stats.classification}
+                  </strong>
+                </div>
+              )}
+
+              {stats?.soil_adjusted_canopy_pct !== undefined && (
+                <div style={{ marginBottom: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>Adjusted Canopy Footprint:</span>
+                  <strong style={{ color: '#10b981', fontFamily: 'var(--font-mono)', fontSize: '12px' }}>
+                    {stats.soil_adjusted_canopy_pct}%
                   </strong>
                 </div>
               )}

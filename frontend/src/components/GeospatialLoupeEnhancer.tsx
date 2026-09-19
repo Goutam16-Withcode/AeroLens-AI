@@ -11,10 +11,12 @@ export const GeospatialLoupeEnhancer: React.FC<GeospatialLoupeEnhancerProps> = (
   const [contrast, setContrast] = useState<number>(100);
   const [filterMode, setFilterMode] = useState<string>('normal');
   const [loupeActive, setLoupeActive] = useState<boolean>(false);
+  const [zoomLevel, setZoomLevel] = useState<number>(4);
   const [loupePos, setLoupePos] = useState<{ x: number; y: number; bgX: number; bgY: number } | null>(null);
 
-  // Distance Measurement Tool
+  // Distance Measurement Tool & Units
   const [measuring, setMeasuring] = useState<boolean>(false);
+  const [distanceUnit, setDistanceUnit] = useState<'m' | 'ft' | 'nm'>('m');
   const [points, setPoints] = useState<Array<{ x: number; y: number }>>([]);
   const [measuredDist, setMeasuredDist] = useState<number | null>(null);
 
@@ -56,6 +58,16 @@ export const GeospatialLoupeEnhancer: React.FC<GeospatialLoupeEnhancerProps> = (
     }
   };
 
+  const handleReset = () => {
+    setBrightness(100);
+    setContrast(100);
+    setFilterMode('normal');
+    setLoupeActive(false);
+    setMeasuring(false);
+    setPoints([]);
+    setMeasuredDist(null);
+  };
+
   const getFilterStyle = () => {
     let base = `brightness(${brightness}%) contrast(${contrast}%)`;
     if (filterMode === 'red') return `${base} sepia(100%) hue-rotate(320deg) saturate(250%)`;
@@ -63,7 +75,23 @@ export const GeospatialLoupeEnhancer: React.FC<GeospatialLoupeEnhancerProps> = (
     if (filterMode === 'blue') return `${base} sepia(100%) hue-rotate(180deg) saturate(250%)`;
     if (filterMode === 'grayscale') return `${base} grayscale(100%)`;
     if (filterMode === 'invert') return `${base} invert(100%)`;
+    if (filterMode === 'edges') return `${base} contrast(400%) grayscale(100%) invert(90%) drop-shadow(1px 1px 1px #000000)`;
     return base;
+  };
+
+  const formatDistance = (meters: number) => {
+    if (distanceUnit === 'ft') {
+      const ft = Math.round(meters * 3.28084);
+      return `${ft.toLocaleString()} FT`;
+    }
+    if (distanceUnit === 'nm') {
+      const nm = (meters / 1852).toFixed(2);
+      return `${nm} NM`;
+    }
+    if (meters >= 1000) {
+      return `${(meters / 1000).toFixed(2)} KM`;
+    }
+    return `${meters} M`;
   };
 
   return (
@@ -78,76 +106,148 @@ export const GeospatialLoupeEnhancer: React.FC<GeospatialLoupeEnhancerProps> = (
           </svg>
           <span>OPTICAL LOUPE & RADIOMETRIC CONTRAST ENHANCER</span>
         </div>
-        <span className="panel-title-tag">SUB-PIXEL ANALYSIS</span>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <button
+            onClick={handleReset}
+            title="Reset contrast, brightness, and optical tools"
+            style={{
+              padding: '3px 8px',
+              background: '#ffffff',
+              border: '1px solid var(--border-subtle)',
+              borderRadius: '4px',
+              fontFamily: 'var(--font-mono)',
+              fontSize: '10px',
+              fontWeight: 700,
+              color: 'var(--text-secondary)',
+              cursor: 'pointer',
+            }}
+          >
+            RESET TOOLS
+          </button>
+          <span className="panel-title-tag">SUB-PIXEL ANALYSIS</span>
+        </div>
       </div>
 
       {/* Control Bar */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'center', marginBottom: '12px', background: '#f8f4ec', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
-        {/* Loupe Toggle */}
-        <button
-          onClick={() => {
-            setLoupeActive(!loupeActive);
-            setMeasuring(false);
-          }}
-          style={{
-            padding: '6px 12px',
-            background: loupeActive ? 'var(--accent-amber-subtle)' : '#ffffff',
-            border: `1px solid ${loupeActive ? 'var(--accent-amber)' : 'var(--border-subtle)'}`,
-            borderRadius: '4px',
-            color: loupeActive ? 'var(--accent-amber)' : 'var(--text-secondary)',
-            fontFamily: 'var(--font-mono)',
-            fontSize: '11px',
-            fontWeight: 700,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            transition: 'all 0.18s ease',
-          }}
-        >
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-            <circle cx="11" cy="11" r="8" />
-            <line x1="21" y1="21" x2="16.65" y2="16.65" />
-          </svg>
-          <span>3X OPTICAL LOUPE: {loupeActive ? 'ON' : 'OFF'}</span>
-        </button>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center', marginBottom: '12px', background: '#f8f4ec', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
+        {/* Loupe Toggle & Zoom Select */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <button
+            onClick={() => {
+              setLoupeActive(!loupeActive);
+              setMeasuring(false);
+            }}
+            style={{
+              padding: '6px 12px',
+              background: loupeActive ? 'var(--accent-amber-subtle)' : '#ffffff',
+              border: `1px solid ${loupeActive ? 'var(--accent-amber)' : 'var(--border-subtle)'}`,
+              borderRadius: '4px',
+              color: loupeActive ? 'var(--accent-amber)' : 'var(--text-secondary)',
+              fontFamily: 'var(--font-mono)',
+              fontSize: '11px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              transition: 'all 0.18s ease',
+            }}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <circle cx="11" cy="11" r="8" />
+              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+            <span>{zoomLevel}X LOUPE: {loupeActive ? 'ON' : 'OFF'}</span>
+          </button>
 
-        {/* Distance Measurement Tool */}
-        <button
-          onClick={() => {
-            setMeasuring(!measuring);
-            setLoupeActive(false);
-            setPoints([]);
-            setMeasuredDist(null);
-          }}
-          style={{
-            padding: '6px 12px',
-            background: measuring ? 'var(--accent-emerald-subtle)' : '#ffffff',
-            border: `1px solid ${measuring ? 'var(--accent-emerald)' : 'var(--border-subtle)'}`,
-            borderRadius: '4px',
-            color: measuring ? 'var(--accent-emerald)' : 'var(--text-secondary)',
-            fontFamily: 'var(--font-mono)',
-            fontSize: '11px',
-            fontWeight: 700,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            transition: 'all 0.18s ease',
-          }}
-        >
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-            <line x1="2" y1="12" x2="22" y2="12" />
-            <line x1="6" y1="8" x2="6" y2="16" />
-            <line x1="12" y1="6" x2="12" y2="18" />
-            <line x1="18" y1="8" x2="18" y2="16" />
-          </svg>
-          <span>METRIC DISTANCE: {measuring ? 'ACTIVE' : 'OFF'}</span>
-        </button>
+          {loupeActive && (
+            <div style={{ display: 'flex', gap: '2px', background: '#ffffff', border: '1px solid var(--border-subtle)', borderRadius: '4px', padding: '2px' }}>
+              {[2, 4, 8].map((z) => (
+                <button
+                  key={z}
+                  onClick={() => setZoomLevel(z)}
+                  style={{
+                    padding: '3px 7px',
+                    background: zoomLevel === z ? 'var(--accent-amber)' : 'transparent',
+                    color: zoomLevel === z ? '#ffffff' : 'var(--text-secondary)',
+                    border: 'none',
+                    borderRadius: '3px',
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: '10px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                >
+                  {z}X
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
 
-        {/* Spectral Band Channels */}
-        <div style={{ display: 'flex', gap: '4px', alignItems: 'center', marginLeft: 'auto' }}>
-          {['normal', 'red', 'green', 'blue', 'grayscale', 'invert'].map((m) => (
+        {/* Distance Measurement Tool & Units */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <button
+            onClick={() => {
+              setMeasuring(!measuring);
+              setLoupeActive(false);
+              setPoints([]);
+              setMeasuredDist(null);
+            }}
+            style={{
+              padding: '6px 12px',
+              background: measuring ? 'var(--accent-emerald-subtle)' : '#ffffff',
+              border: `1px solid ${measuring ? 'var(--accent-emerald)' : 'var(--border-subtle)'}`,
+              borderRadius: '4px',
+              color: measuring ? 'var(--accent-emerald)' : 'var(--text-secondary)',
+              fontFamily: 'var(--font-mono)',
+              fontSize: '11px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              transition: 'all 0.18s ease',
+            }}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <line x1="2" y1="12" x2="22" y2="12" />
+              <line x1="6" y1="8" x2="6" y2="16" />
+              <line x1="12" y1="6" x2="12" y2="18" />
+              <line x1="18" y1="8" x2="18" y2="16" />
+            </svg>
+            <span>METRIC DISTANCE: {measuring ? 'ACTIVE' : 'OFF'}</span>
+          </button>
+
+          {measuring && (
+            <div style={{ display: 'flex', gap: '2px', background: '#ffffff', border: '1px solid var(--border-subtle)', borderRadius: '4px', padding: '2px' }}>
+              {(['m', 'ft', 'nm'] as const).map((u) => (
+                <button
+                  key={u}
+                  onClick={() => setDistanceUnit(u)}
+                  style={{
+                    padding: '3px 7px',
+                    background: distanceUnit === u ? 'var(--accent-emerald)' : 'transparent',
+                    color: distanceUnit === u ? '#ffffff' : 'var(--text-secondary)',
+                    border: 'none',
+                    borderRadius: '3px',
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: '10px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    textTransform: 'uppercase',
+                  }}
+                >
+                  {u}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Spectral Band Channels & Spatial Filters */}
+        <div style={{ display: 'flex', gap: '4px', alignItems: 'center', marginLeft: 'auto', flexWrap: 'wrap' }}>
+          {['normal', 'red', 'green', 'blue', 'grayscale', 'invert', 'edges'].map((m) => (
             <button
               key={m}
               onClick={() => setFilterMode(m)}
@@ -287,25 +387,25 @@ export const GeospatialLoupeEnhancer: React.FC<GeospatialLoupeEnhancerProps> = (
                   pointerEvents: 'none',
                 }}
               >
-                DISTANCE: {measuredDist} METERS
+                DISTANCE: {formatDistance(measuredDist)}
               </div>
             )}
 
-            {/* 3x Circular Magnifying Loupe Lens */}
+            {/* Variable Circular Magnifying Loupe Lens */}
             {loupeActive && loupePos && (
               <div
                 style={{
                   position: 'absolute',
-                  top: `${loupePos.y - 65}px`,
-                  left: `${loupePos.x - 65}px`,
-                  width: '130px',
-                  height: '130px',
+                  top: `${loupePos.y - 70}px`,
+                  left: `${loupePos.x - 70}px`,
+                  width: '140px',
+                  height: '140px',
                   borderRadius: '50%',
                   border: '2.5px solid var(--accent-amber)',
                   boxShadow: '0 0 20px rgba(245, 158, 11, 0.7), inset 0 0 10px rgba(0,0,0,0.8)',
                   backgroundImage: `url(${imageSrc})`,
                   backgroundRepeat: 'no-repeat',
-                  backgroundSize: '400%',
+                  backgroundSize: `${zoomLevel * 100}%`,
                   backgroundPosition: `${loupePos.bgX}% ${loupePos.bgY}%`,
                   pointerEvents: 'none',
                   zIndex: 20,
@@ -323,6 +423,23 @@ export const GeospatialLoupeEnhancer: React.FC<GeospatialLoupeEnhancerProps> = (
                     background: 'var(--accent-amber)',
                   }}
                 />
+                <div
+                  style={{
+                    position: 'absolute',
+                    bottom: '6px',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    background: 'rgba(0,0,0,0.75)',
+                    color: '#ffffff',
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: '9px',
+                    padding: '1px 5px',
+                    borderRadius: '3px',
+                    fontWeight: 700,
+                  }}
+                >
+                  {zoomLevel}X
+                </div>
               </div>
             )}
           </>
