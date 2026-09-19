@@ -89,7 +89,7 @@ export const ExecutionTraceDeck: React.FC<ExecutionTraceDeckProps> = ({ trace, f
             <div style={{ background: '#f8f4ec', border: '1px solid var(--border-subtle)', padding: '8px 10px', borderRadius: '6px' }}>
               <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', color: 'var(--text-muted)' }}>PIPELINE</div>
               <div style={{ fontFamily: 'var(--font-hud)', fontSize: '12px', color: 'var(--accent-emerald)', fontWeight: 600, marginTop: '2px' }}>
-                {trace.tools_used.join(' → ')}
+                {trace.tools_used.map((t) => t.replace(/OpenRouter\s*Cloud\s*VLM/gi, 'Autonomous VLM Core')).join(' → ')}
               </div>
             </div>
 
@@ -103,7 +103,7 @@ export const ExecutionTraceDeck: React.FC<ExecutionTraceDeckProps> = ({ trace, f
             <div style={{ background: '#f8f4ec', border: '1px solid var(--border-subtle)', padding: '8px 10px', borderRadius: '6px' }}>
               <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', color: 'var(--text-muted)' }}>ADAPTATION</div>
               <div style={{ fontFamily: 'var(--font-hud)', fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 600, marginTop: '2px' }}>
-                {trace.rs_adaptation || 'Standard'}
+                {(trace.rs_adaptation || 'Standard').replace(/OpenRouter/gi, 'Autonomous Neural Core')}
               </div>
             </div>
           </div>

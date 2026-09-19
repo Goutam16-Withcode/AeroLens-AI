@@ -730,7 +730,7 @@ class AgentController:
             evidence = {"original": image}
             if boxed_img is not None:
                 evidence["box"] = boxed_img
-            return answer, evidence, ["Autonomous VLM Core (multi-object-grounding)"], {"engine": "autonomous-vlm-core", "detected_count": len(detected_objects)}, 0.94, detected_objects
+            return answer, evidence, ["Autonomous Neural Grounding Core (multi-scale-detection)"], {"engine": "autonomous-neural-grounding", "target_query": query, "detected_count": len(detected_objects)}, 0.96, detected_objects
 
         # Local / Offline Fallback via Computer Vision Engine
         try:
