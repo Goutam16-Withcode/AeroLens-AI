@@ -14,7 +14,9 @@ export const OrbitalHeader: React.FC<OrbitalHeaderProps> = ({ status: propStatus
   useEffect(() => {
     const updateTime = () => {
       const now = new Date();
-      setClock(now.toUTCString().replace('GMT', 'UTC'));
+      const localTime = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+      const utcTime = now.toISOString().substring(11, 19) + ' UTC';
+      setClock(`${localTime} LOCAL · ${utcTime}`);
     };
     updateTime();
     const timer = setInterval(updateTime, 1000);
@@ -52,10 +54,10 @@ export const OrbitalHeader: React.FC<OrbitalHeaderProps> = ({ status: propStatus
         </div>
         <div>
           <div className="brand-title">
-            SAT<span>QUERY</span> AI
+            AERO<span>LENS</span> AI
           </div>
           <div className="brand-subtitle">
-            MULTISPECTRAL EARTH OBSERVATION // 5-TOOL AGENTIC VLM
+            AUTONOMOUS ORBITAL EARTH OBSERVATION // 5-TOOL AGENTIC VLM
           </div>
         </div>
       </div>

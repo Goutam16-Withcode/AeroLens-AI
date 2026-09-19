@@ -588,6 +588,61 @@ class AgentResult:
 
 
 # ============================================================
+# SINGLE-IMAGE 4-SLOT EVIDENCE SYNTHESIS
+# ============================================================
+def synthesize_single_image_evidence(image: Image.Image, query: str = "", detected_objects: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Image.Image]:
+    """
+    Ensure all 4 Evidence Matrix slots are fully decoded and rendered even for single-image queries:
+    - Slot 1 (original): Primary optical sensor stream
+    - Slot 2 (attention): Multi-scale spatial saliency & attention heatmap
+    - Slot 3 (box): Tactical reticle overlay on detected targets or key infrastructure
+    - Slot 4 (after/spectral): Authentic NASA False-Color Infrared (CIR) composite
+    """
+    evidence: Dict[str, Image.Image] = {"original": image}
+    
+    # 1. Multi-scale Attention Saliency Map (Slot 2)
+    norm_attn = None
+    try:
+        import cv2
+        rgb_np = np.array(image.convert("RGB"))
+        gray = cv2.cvtColor(rgb_np, cv2.COLOR_RGB2GRAY)
+        grad_x = cv2.Sobel(gray, cv2.CV_32F, 1, 0, ksize=3)
+        grad_y = cv2.Sobel(gray, cv2.CV_32F, 0, 1, ksize=3)
+        mag = cv2.magnitude(grad_x, grad_y)
+        blurred_mag = cv2.GaussianBlur(mag, (25, 25), 0)
+        denom = float(blurred_mag.max() - blurred_mag.min() + 1e-6)
+        norm_attn = (blurred_mag - blurred_mag.min()) / denom
+        evidence["attention"] = _overlay(image, norm_attn, alpha=0.52)
+    except Exception as e:
+        print(f"[evidence] Saliency generation notice: {e}")
+
+    # 2. Target Reticles & Grounding Overlay (Slot 3)
+    try:
+        boxes_to_draw = detected_objects or []
+        if not boxes_to_draw:
+            from satquery.models.engine import RemoteSensingVLMEngine
+            _, cv_boxes = RemoteSensingVLMEngine.get_instance().detect_all_objects(image)
+            boxes_to_draw = cv_boxes[:15]
+            
+        if boxes_to_draw:
+            evidence["box"] = draw_bounding_boxes(image, boxes_to_draw)
+        elif "attention" in evidence and norm_attn is not None:
+            evidence["box"] = _region_box(image, norm_attn)
+    except Exception as e:
+        print(f"[evidence] Target reticle generation notice: {e}")
+
+    # 3. Authentic NASA False-Color Infrared (CIR) Synthesis (Slot 4)
+    try:
+        from satquery.core.spectral_indices import compute_spectral_index
+        cir_img, _ = compute_spectral_index(image, index_type="cir")
+        evidence["after"] = cir_img
+    except Exception as e:
+        print(f"[evidence] CIR spectral synthesis notice: {e}")
+
+    return evidence
+
+
+# ============================================================
 # AGENT CONTROLLER
 # ============================================================
 class AgentController:
@@ -661,58 +716,6 @@ class AgentController:
         if task == Task.OPTICAL_SAR_FUSION:
             return self._tool_fusion(model, processor, img_a, img_b, mod_a, mod_b, query)
         raise ValueError(f"Unhandled task: {task}")
-
-def synthesize_single_image_evidence(image: Image.Image, query: str = "", detected_objects: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Image.Image]:
-    """
-    Ensure all 4 Evidence Matrix slots are fully decoded and rendered even for single-image queries:
-    - Slot 1 (original): Primary optical sensor stream
-    - Slot 2 (attention): Multi-scale spatial saliency & attention heatmap
-    - Slot 3 (box): Tactical reticle overlay on detected targets or key infrastructure
-    - Slot 4 (after/spectral): Authentic NASA False-Color Infrared (CIR) composite
-    """
-    evidence: Dict[str, Image.Image] = {"original": image}
-    
-    # 1. Multi-scale Attention Saliency Map (Slot 2)
-    norm_attn = None
-    try:
-        import cv2
-        rgb_np = np.array(image.convert("RGB"))
-        gray = cv2.cvtColor(rgb_np, cv2.COLOR_RGB2GRAY)
-        grad_x = cv2.Sobel(gray, cv2.CV_32F, 1, 0, ksize=3)
-        grad_y = cv2.Sobel(gray, cv2.CV_32F, 0, 1, ksize=3)
-        mag = cv2.magnitude(grad_x, grad_y)
-        blurred_mag = cv2.GaussianBlur(mag, (25, 25), 0)
-        denom = float(blurred_mag.max() - blurred_mag.min() + 1e-6)
-        norm_attn = (blurred_mag - blurred_mag.min()) / denom
-        evidence["attention"] = _overlay(image, norm_attn, alpha=0.52)
-    except Exception as e:
-        print(f"[evidence] Saliency generation notice: {e}")
-
-    # 2. Target Reticles & Grounding Overlay (Slot 3)
-    try:
-        boxes_to_draw = detected_objects or []
-        if not boxes_to_draw:
-            from satquery.models.engine import RemoteSensingVLMEngine
-            _, cv_boxes = RemoteSensingVLMEngine.get_instance().detect_all_objects(image)
-            boxes_to_draw = cv_boxes[:15]
-            
-        if boxes_to_draw:
-            evidence["box"] = draw_bounding_boxes(image, boxes_to_draw)
-        elif "attention" in evidence and norm_attn is not None:
-            evidence["box"] = _region_box(image, norm_attn)
-    except Exception as e:
-        print(f"[evidence] Target reticle generation notice: {e}")
-
-    # 3. Authentic NASA False-Color Infrared (CIR) Synthesis (Slot 4)
-    try:
-        from satquery.core.spectral_indices import compute_spectral_index
-        cir_img, _ = compute_spectral_index(image, index_type="cir")
-        evidence["after"] = cir_img
-    except Exception as e:
-        print(f"[evidence] CIR spectral synthesis notice: {e}")
-
-    return evidence
-
 
     # ---- single-image VQA ----
     def _tool_vqa(self, model, processor, image, query):
