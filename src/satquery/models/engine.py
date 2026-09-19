@@ -143,15 +143,23 @@ class RemoteSensingVLMEngine:
                    "urban": float(np.count_nonzero(paved_mask[half_h:, half_w:])) / (half_h * half_w + 1e-6) * 100.0}
         }
         
-        # 10. Dynamic Multi-Scale Contours
-        blur = cv2.GaussianBlur(gray, (5, 5), 0)
-        _, thresh = cv2.threshold(blur, 190, 255, cv2.THRESH_BINARY)
+        # 10. Dynamic Multi-Scale Contours (Filtered & Calibrated)
+        blur = cv2.GaussianBlur(gray, (7, 7), 0)
+        # Use Otsu adaptive thresholding for robust contrast separation
+        otsu_val, _ = cv2.threshold(blur, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        effective_thresh = max(160, int(otsu_val))
+        _, thresh = cv2.threshold(blur, effective_thresh, 255, cv2.THRESH_BINARY)
         contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         
         detected_objects = []
-        for c in contours:
+        min_obj_area = max(160, int(h * w * 0.0008))
+        max_obj_area = int(h * w * 0.18)
+        
+        # Sort contours by area descending to prioritize prominent features
+        sorted_cnts = sorted(contours, key=cv2.contourArea, reverse=True)
+        for c in sorted_cnts:
             area = cv2.contourArea(c)
-            if 35 < area < (h * w * 0.25):
+            if min_obj_area < area < max_obj_area:
                 x, y, bw, bh = cv2.boundingRect(c)
                 perimeter = cv2.arcLength(c, True)
                 circularity = (4 * np.pi * area) / (perimeter ** 2 + 1e-6)
@@ -164,6 +172,8 @@ class RemoteSensingVLMEngine:
                     "aspect_ratio": round(bw / (bh + 1e-6), 2),
                     "circularity": round(circularity, 2)
                 })
+                if len(detected_objects) >= 35:
+                    break
                 
         # 11. Specific Feature Mask Contours (Vegetation & Water Clusters)
         veg_u8 = (veg_mask.astype(np.uint8)) * 255
@@ -730,111 +740,127 @@ class RemoteSensingVLMEngine:
         if target_classes and target_classes.lower() != "all":
             target_set = {t.strip().lower() for t in target_classes.split(",")}
             
-        all_boxes: List[Dict[str, Any]] = []
-        box_id = 1
-        
-        # 1. Airplanes / Aircraft
-        if not target_set or any(k in target_set for k in ["airplane", "plane", "aircraft"]):
-            for cand in detected_candidates:
-                if 0.6 <= cand.get("aspect_ratio", 1.0) <= 2.3 and cand.get("area_px", 0) > 75:
-                    all_boxes.append({
-                        "id": f"det_{box_id}",
-                        "label": "airplane",
-                        "category": "Aircraft / Passenger Jet",
-                        "confidence": 0.94,
+        # Mutually Exclusive Target Classification & High-Precision Grounding
+        raw_boxes = []
+        for cand in detected_candidates:
+            area = cand.get("area_px", 0)
+            circ = cand.get("circularity", 0)
+            ar = cand.get("aspect_ratio", 1.0)
+            
+            # Score specific satellite object categories exclusively
+            matched_cat = None
+            matched_label = None
+            conf = 0.88
+            color = "rgb(245, 158, 11)"
+            
+            # Storage Tank: high circularity
+            if circ > 0.62 and area > 60:
+                matched_label = "storage_tank"
+                matched_cat = "Bulk Storage Tank"
+                conf = 0.94
+                color = "rgb(245, 158, 11)"
+            # Ship / Marine vessel: elongated, isolated in water or dock
+            elif ar >= 2.2 and area > 100:
+                matched_label = "ship"
+                matched_cat = "Marine Vessel"
+                conf = 0.91
+                color = "rgb(6, 182, 212)"
+            # Airplane: cruciform geometry, balanced aspect ratio with moderate area
+            elif 0.75 <= ar <= 1.8 and circ < 0.55 and 120 < area < (w * h * 0.08):
+                matched_label = "airplane"
+                matched_cat = "Aircraft / Airframe"
+                conf = 0.92
+                color = "rgb(16, 185, 129)"
+            # Building / Built Structure: rectilinear footprint
+            elif area > 180 and 0.5 <= ar <= 2.5:
+                matched_label = "building"
+                matched_cat = "Built Structure"
+                conf = 0.89
+                color = "rgb(244, 63, 94)"
+            # Vehicle / Container: compact footprint
+            elif 45 <= area <= 280:
+                matched_label = "vehicle"
+                matched_cat = "Vehicle / Container"
+                conf = 0.86
+                color = "rgb(168, 85, 247)"
+                
+            if matched_label:
+                # Filter against target_set if user specified specific classes
+                if not target_set or any(k in target_set for k in [matched_label, matched_cat.lower()]):
+                    raw_boxes.append({
+                        "label": matched_label,
+                        "category": matched_cat,
+                        "confidence": conf,
                         "ymin": cand["ymin"], "xmin": cand["xmin"],
                         "ymax": cand["ymax"], "xmax": cand["xmax"],
-                        "color": "rgb(16, 185, 129)"
+                        "color": color,
+                        "area_px": area
                     })
-                    box_id += 1
 
-        # 2. Storage Tanks / Petroleum Silos
-        if not target_set or any(k in target_set for k in ["tank", "storage", "fuel", "silo"]):
-            for cand in detected_candidates:
-                if cand.get("circularity", 0) > 0.48 and cand.get("area_px", 0) > 40:
-                    all_boxes.append({
-                        "id": f"det_{box_id}",
-                        "label": "storage_tank",
-                        "category": "Bulk Storage Tank",
-                        "confidence": 0.92,
-                        "ymin": cand["ymin"], "xmin": cand["xmin"],
-                        "ymax": cand["ymax"], "xmax": cand["xmax"],
-                        "color": "rgb(245, 158, 11)"
-                    })
-                    box_id += 1
-
-        # 3. Ships / Maritime Vessels
-        if not target_set or any(k in target_set for k in ["ship", "vessel", "boat"]):
-            for cand in detected_candidates:
-                if cand.get("aspect_ratio", 1.0) >= 1.6 and cand.get("area_px", 0) > 85:
-                    all_boxes.append({
-                        "id": f"det_{box_id}",
-                        "label": "ship",
-                        "category": "Marine Vessel",
-                        "confidence": 0.90,
-                        "ymin": cand["ymin"], "xmin": cand["xmin"],
-                        "ymax": cand["ymax"], "xmax": cand["xmax"],
-                        "color": "rgb(6, 182, 212)"
-                    })
-                    box_id += 1
-
-        # 4. Buildings & Infrastructure
-        if not target_set or any(k in target_set for k in ["building", "structure", "warehouse", "facility"]):
-            for cand in detected_candidates:
-                if cand.get("area_px", 0) > 130 and 0.4 <= cand.get("aspect_ratio", 1.0) <= 2.8:
-                    all_boxes.append({
-                        "id": f"det_{box_id}",
-                        "label": "building",
-                        "category": "Built Structure",
-                        "confidence": 0.89,
-                        "ymin": cand["ymin"], "xmin": cand["xmin"],
-                        "ymax": cand["ymax"], "xmax": cand["xmax"],
-                        "color": "rgb(244, 63, 94)"
-                    })
-                    box_id += 1
-
-        # 5. Vehicles / Containers
-        if not target_set or any(k in target_set for k in ["vehicle", "car", "truck", "container"]):
-            for cand in detected_candidates:
-                if 20 <= cand.get("area_px", 0) <= 220:
-                    all_boxes.append({
-                        "id": f"det_{box_id}",
-                        "label": "vehicle",
-                        "category": "Vehicle / Container",
-                        "confidence": 0.85,
-                        "ymin": cand["ymin"], "xmin": cand["xmin"],
-                        "ymax": cand["ymax"], "xmax": cand["xmax"],
-                        "color": "rgb(168, 85, 247)"
-                    })
-                    box_id += 1
-
-        # 6. Water Bodies & Hydrological Features
+        # Add hydrological and canopy clusters if requested or general
         if not target_set or any(k in target_set for k in ["water", "river", "reservoir", "lake"]):
-            for w_box in m.get("water_clusters", [])[:3]:
-                all_boxes.append({
-                    "id": f"det_{box_id}",
+            for w_box in m.get("water_clusters", [])[:2]:
+                raw_boxes.append({
                     "label": "water_body",
                     "category": "Hydrological Water Feature",
                     "confidence": 0.93,
                     "ymin": w_box["ymin"], "xmin": w_box["xmin"],
                     "ymax": w_box["ymax"], "xmax": w_box["xmax"],
-                    "color": "rgb(59, 130, 246)"
+                    "color": "rgb(59, 130, 246)",
+                    "area_px": 5000
                 })
-                box_id += 1
 
-        # 7. Vegetation Zones
         if not target_set or any(k in target_set for k in ["vegetation", "forest", "tree", "canopy"]):
-            for v_box in m.get("veg_clusters", [])[:3]:
-                all_boxes.append({
-                    "id": f"det_{box_id}",
+            for v_box in m.get("veg_clusters", [])[:2]:
+                raw_boxes.append({
                     "label": "vegetation",
                     "category": "Forest / Vegetation Canopy",
                     "confidence": 0.91,
                     "ymin": v_box["ymin"], "xmin": v_box["xmin"],
                     "ymax": v_box["ymax"], "xmax": v_box["xmax"],
-                    "color": "rgb(22, 163, 74)"
+                    "color": "rgb(22, 163, 74)",
+                    "area_px": 5000
                 })
-                box_id += 1
+
+        # Non-Maximum Suppression (NMS) to eliminate duplicate/nested bounding boxes
+        def _calc_iou(b1, b2):
+            xi1 = max(b1["xmin"], b2["xmin"])
+            yi1 = max(b1["ymin"], b2["ymin"])
+            xi2 = min(b1["xmax"], b2["xmax"])
+            yi2 = min(b1["ymax"], b2["ymax"])
+            iw = max(0.0, xi2 - xi1)
+            ih = max(0.0, yi2 - yi1)
+            inter = iw * ih
+            a1 = (b1["xmax"] - b1["xmin"]) * (b1["ymax"] - b1["ymin"])
+            a2 = (b2["xmax"] - b2["xmin"]) * (b2["ymax"] - b2["ymin"])
+            union = a1 + a2 - inter
+            return inter / (union + 1e-8)
+
+        # Sort raw boxes by confidence and area
+        raw_boxes.sort(key=lambda b: (b["confidence"], b.get("area_px", 0)), reverse=True)
+        suppressed = [False] * len(raw_boxes)
+        all_boxes: List[Dict[str, Any]] = []
+        box_id = 1
+
+        for i in range(len(raw_boxes)):
+            if suppressed[i]:
+                continue
+            b = raw_boxes[i]
+            all_boxes.append({
+                "id": f"det_{box_id}",
+                "label": b["label"],
+                "category": b["category"],
+                "confidence": b["confidence"],
+                "ymin": b["ymin"], "xmin": b["xmin"],
+                "ymax": b["ymax"], "xmax": b["xmax"],
+                "color": b["color"]
+            })
+            box_id += 1
+            if len(all_boxes) >= 20:
+                break
+            for j in range(i + 1, len(raw_boxes)):
+                if not suppressed[j] and _calc_iou(b, raw_boxes[j]) > 0.35:
+                    suppressed[j] = True
 
         # Fallback if no specific objects found
         if not all_boxes and detected_candidates:
