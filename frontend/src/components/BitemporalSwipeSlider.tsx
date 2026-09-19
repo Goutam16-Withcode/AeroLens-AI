@@ -183,117 +183,202 @@ export const BitemporalSwipeSlider: React.FC<BitemporalSwipeSliderProps> = ({
             height: '280px',
             borderRadius: '8px',
             overflow: 'hidden',
-            cursor: 'ew-resize',
+            cursor: comparisonMode === 'split' ? 'ew-resize' : 'default',
             userSelect: 'none',
             background: '#f0eae0',
             border: '1px solid var(--border-subtle)',
           }}
-          onMouseDown={() => setIsDragging(true)}
-          onMouseUp={() => setIsDragging(false)}
-          onMouseLeave={() => setIsDragging(false)}
-          onMouseMove={(e) => isDragging && handleMove(e.clientX)}
-          onTouchMove={(e) => handleMove(e.touches[0].clientX)}
+          onMouseDown={() => comparisonMode === 'split' && setIsDragging(true)}
+          onMouseUp={() => comparisonMode === 'split' && setIsDragging(false)}
+          onMouseLeave={() => comparisonMode === 'split' && setIsDragging(false)}
+          onMouseMove={(e) => comparisonMode === 'split' && isDragging && handleMove(e.clientX)}
+          onTouchMove={(e) => comparisonMode === 'split' && handleMove(e.touches[0].clientX)}
         >
-          {/* Bottom Image (After T2) */}
-          <img
-            src={imageAfter}
-            alt={titleAfter}
-            style={{
-              position: 'absolute',
-              inset: 0,
-              width: '100%',
-              height: '100%',
-              objectFit: 'contain',
-            }}
-          />
-          <div
-            style={{
-              position: 'absolute',
-              bottom: '10px',
-              right: '12px',
-              fontFamily: 'var(--font-mono)',
-              fontSize: '10px',
-              padding: '3px 8px',
-              background: 'rgba(190, 18, 60, 0.9)',
-              color: '#ffffff',
-              borderRadius: '4px',
-              fontWeight: 700,
-              boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
-            }}
-          >
-            {titleAfter}
-          </div>
-
-          {/* Top Image (Before T1) with Clip Path */}
-          <div
-            style={{
-              position: 'absolute',
-              inset: 0,
-              width: `${sliderPos}%`,
-              overflow: 'hidden',
-              borderRight: '2.5px solid var(--accent-amber)',
-              boxShadow: '2px 0 12px rgba(194, 109, 46, 0.4)',
-            }}
-          >
-            <img
-              src={imageBefore}
-              alt={titleBefore}
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                width: containerRef.current ? `${containerRef.current.clientWidth}px` : '100%',
-                height: '100%',
-                objectFit: 'contain',
-                maxWidth: 'none',
-              }}
-            />
-            <div
-              style={{
-                position: 'absolute',
-                bottom: '10px',
-                left: '12px',
-                fontFamily: 'var(--font-mono)',
-                fontSize: '10px',
-                padding: '3px 8px',
-                background: 'rgba(194, 109, 46, 0.95)',
-                color: '#ffffff',
-                borderRadius: '4px',
-                fontWeight: 700,
-                boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
-              }}
-            >
-              {titleBefore}
+          {comparisonMode === 'blink' ? (
+            /* Mode 2: Astronomical Blink Comparator */
+            <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+              <img
+                src={blinkFrame === 'T1' ? imageBefore : imageAfter}
+                alt={blinkFrame === 'T1' ? titleBefore : titleAfter}
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'contain',
+                }}
+              />
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '12px',
+                  right: '12px',
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: '11px',
+                  padding: '4px 10px',
+                  background: blinkFrame === 'T1' ? 'rgba(194, 109, 46, 0.95)' : 'rgba(190, 18, 60, 0.95)',
+                  color: '#ffffff',
+                  borderRadius: '4px',
+                  fontWeight: 800,
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                }}
+              >
+                <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ffffff', display: 'inline-block' }} />
+                <span>{blinkFrame === 'T1' ? titleBefore : titleAfter}</span>
+              </div>
             </div>
-          </div>
+          ) : comparisonMode === 'dissolve' ? (
+            /* Mode 3: Continuous Dissolve Cross-Fade */
+            <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+              <img
+                src={imageBefore}
+                alt={titleBefore}
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'contain',
+                  opacity: (100 - dissolveOpacity) / 100,
+                  transition: 'opacity 0.05s ease',
+                }}
+              />
+              <img
+                src={imageAfter}
+                alt={titleAfter}
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'contain',
+                  opacity: dissolveOpacity / 100,
+                  transition: 'opacity 0.05s ease',
+                }}
+              />
+              <div
+                style={{
+                  position: 'absolute',
+                  bottom: '10px',
+                  left: '12px',
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: '10px',
+                  padding: '3px 8px',
+                  background: 'rgba(15, 23, 42, 0.88)',
+                  color: '#ffffff',
+                  borderRadius: '4px',
+                  fontWeight: 700,
+                }}
+              >
+                FADE: T1 ({100 - dissolveOpacity}%) ↔ T2 ({dissolveOpacity}%)
+              </div>
+            </div>
+          ) : (
+            /* Mode 1: Interactive Split Curtain */
+            <>
+              {/* Bottom Image (After T2) */}
+              <img
+                src={imageAfter}
+                alt={titleAfter}
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'contain',
+                }}
+              />
+              <div
+                style={{
+                  position: 'absolute',
+                  bottom: '10px',
+                  right: '12px',
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: '10px',
+                  padding: '3px 8px',
+                  background: 'rgba(190, 18, 60, 0.9)',
+                  color: '#ffffff',
+                  borderRadius: '4px',
+                  fontWeight: 700,
+                  boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
+                }}
+              >
+                {titleAfter}
+              </div>
 
-          {/* Divider Handle */}
-          <div
-            style={{
-              position: 'absolute',
-              top: '50%',
-              left: `${sliderPos}%`,
-              transform: 'translate(-50%, -50%)',
-              width: '32px',
-              height: '32px',
-              background: 'var(--accent-amber)',
-              color: '#ffffff',
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontWeight: 800,
-              boxShadow: '0 2px 10px rgba(194, 109, 46, 0.6)',
-              pointerEvents: 'none',
-              zIndex: 10,
-            }}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <polyline points="7 16 3 12 7 8" />
-              <polyline points="17 8 21 12 17 16" />
-              <line x1="3" y1="12" x2="21" y2="12" />
-            </svg>
-          </div>
+              {/* Top Image (Before T1) with Clip Path */}
+              <div
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  width: `${sliderPos}%`,
+                  overflow: 'hidden',
+                  borderRight: '2.5px solid var(--accent-amber)',
+                  boxShadow: '2px 0 12px rgba(194, 109, 46, 0.4)',
+                }}
+              >
+                <img
+                  src={imageBefore}
+                  alt={titleBefore}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: containerRef.current ? `${containerRef.current.clientWidth}px` : '100%',
+                    height: '100%',
+                    objectFit: 'contain',
+                    maxWidth: 'none',
+                  }}
+                />
+                <div
+                  style={{
+                    position: 'absolute',
+                    bottom: '10px',
+                    left: '12px',
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: '10px',
+                    padding: '3px 8px',
+                    background: 'rgba(194, 109, 46, 0.95)',
+                    color: '#ffffff',
+                    borderRadius: '4px',
+                    fontWeight: 700,
+                    boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
+                  }}
+                >
+                  {titleBefore}
+                </div>
+              </div>
+
+              {/* Divider Handle */}
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '50%',
+                  left: `${sliderPos}%`,
+                  transform: 'translate(-50%, -50%)',
+                  width: '32px',
+                  height: '32px',
+                  background: 'var(--accent-amber)',
+                  color: '#ffffff',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontWeight: 800,
+                  boxShadow: '0 2px 10px rgba(194, 109, 46, 0.6)',
+                  pointerEvents: 'none',
+                  zIndex: 10,
+                }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <polyline points="7 16 3 12 7 8" />
+                  <polyline points="17 8 21 12 17 16" />
+                  <line x1="3" y1="12" x2="21" y2="12" />
+                </svg>
+              </div>
+            </>
+          )}
         </div>
       ) : (
         <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px', fontStyle: 'italic' }}>
