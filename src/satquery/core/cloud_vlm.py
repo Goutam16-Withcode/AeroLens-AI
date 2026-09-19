@@ -376,13 +376,25 @@ def parse_boxes_with_metadata(img: Image.Image, text: str) -> Tuple[Optional[Ima
     return annotated, bboxes
 
 
+DEFAULT_SYSTEM_PROMPT = (
+    "You are SatQuery AI, an elite aerospace remote sensing intelligence analyst and planetary scientist. "
+    "Generate exhaustive, scientifically rigorous, in-depth intelligence reports for satellite earth observation imagery. "
+    "Organize your findings with professional Markdown headings, quantitative assessments, and high technical depth. "
+    "When inspecting meteorological imagery (e.g. INSAT-3D/3DS, GOES, Meteosat, Himawari), detail spectral channel physics "
+    "(e.g. TIR-1 10.8µm thermal infrared, Water Vapor 6.9µm), cloud-top brightness temperatures (cold high-altitude white clouds vs warm dark surface), "
+    "convective thunderstorm cores, wind shear, and frontal boundaries. "
+    "When inspecting high-resolution optical or SAR scenes, evaluate land cover categories, infrastructure density, hydrological boundaries, and tactical objects. "
+    "Avoid superficial summaries. Provide rich, actionable, granular domain insight."
+)
+
+
 def call_cloud_vlm(
     prompt: str,
     image_a: Image.Image,
     image_b: Optional[Image.Image] = None,
     system_instruction: Optional[str] = None,
     model: str = DEFAULT_MODEL,
-    max_tokens: int = 500,
+    max_tokens: int = 1400,
 ) -> str:
     """Send image(s) and prompt to OpenRouter Cloud VLM API."""
     key = get_api_key()
@@ -407,10 +419,11 @@ def call_cloud_vlm(
             "image_url": {"url": pil_to_data_uri(image_b)},
         })
 
-    messages = []
-    if system_instruction:
-        messages.append({"role": "system", "content": system_instruction})
-    messages.append({"role": "user", "content": content})
+    sys_prompt = system_instruction or DEFAULT_SYSTEM_PROMPT
+    messages = [
+        {"role": "system", "content": sys_prompt},
+        {"role": "user", "content": content},
+    ]
 
     candidate_models = [model, "inclusionai/ling-3.0-flash-vl:free", "google/gemini-3.5-flash-lite", "qwen/qwen3.8-flash"]
 

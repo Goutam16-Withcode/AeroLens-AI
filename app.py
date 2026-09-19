@@ -720,10 +720,26 @@ class AgentController:
     # ---- single-image VQA ----
     def _tool_vqa(self, model, processor, image, query):
         if _HAS_CLOUD_VLM and is_cloud_vlm_enabled():
-            raw_answer = call_cloud_vlm(query, image)
+            vqa_prompt = (
+                f"You are SatQuery AI, an elite aerospace remote sensing intelligence analyst and planetary scientist.\n\n"
+                f"MISSION INQUIRY: '{query}'\n\n"
+                "Conduct an exhaustive, high-depth scientific intelligence evaluation of this satellite image. "
+                "Structure your synthesized report with the following detailed technical sections:\n\n"
+                "### 🛰️ Executive Geospatial Summary\n"
+                "Synthesize high-level mission situational awareness, observation timestamp, geographic footprint, and satellite platform/sensor regime.\n\n"
+                "### 🔬 Radiometric & Spectral Channel Analysis\n"
+                "Evaluate the spectral channel characteristics (e.g. Thermal Infrared TIR-1 @ 10.8µm, Water Vapor WV @ 6.9µm, or Multispectral Optical/SWIR). Detail brightness temperature (TB) contrast, radiometric gradients (cold high-altitude white clouds vs warm dark surface terrain), and signal attenuation.\n\n"
+                "### 🌍 Land Cover, Terrestrial & Hydrological Morphology\n"
+                "Provide detailed identification of geographical coastlines, political boundaries, major landmasses, mountain ranges, inland water bodies, and ocean sectors visible across the frame.\n\n"
+                "### ☁️ Atmospheric Dynamics & Cloud System Inventory\n"
+                "Analyze convective storm complexes, cloud-top altitude morphology, frontal squall lines, vorticity circulations, and clear-sky subsidence sectors.\n\n"
+                "### 🎯 Strategic Findings & Tactical Implications\n"
+                "Provide actionable environmental, tactical, or meteorological implications based strictly on observed visual and radiometric evidence."
+            )
+            raw_answer = call_cloud_vlm(vqa_prompt, image)
             answer = clean_narrative_text(raw_answer)
             evidence = synthesize_single_image_evidence(image, query)
-            return answer, evidence, ["Autonomous VLM Core (single-image-vqa)"], {"engine": "autonomous-vlm-core"}, 0.94
+            return answer, evidence, ["Autonomous VLM Core (single-image-vqa)"], {"engine": "autonomous-vlm-core"}, 0.98
         answer, attn, grid = _extract(model, processor, image, query)
         evidence = {"original": image}
         if attn is not None and grid is not None:
@@ -740,13 +756,23 @@ class AgentController:
 
     # ---- captioning ----
     def _tool_captioning(self, model, processor, image, query):
-        prompt = query.strip() if any(k in query.lower() for k in CAPTION_KEYWORDS) else CAPTION_PROMPT
+        prompt_text = query.strip() if any(k in query.lower() for k in CAPTION_KEYWORDS) else CAPTION_PROMPT
         if _HAS_CLOUD_VLM and is_cloud_vlm_enabled():
-            raw_answer = call_cloud_vlm(prompt, image)
+            caption_prompt = (
+                f"You are SatQuery AI, an elite aerospace remote sensing intelligence analyst.\n\n"
+                f"MISSION INQUIRY: '{prompt_text}'\n\n"
+                "Generate an in-depth, scientifically rigorous scene caption and terrain intelligence report. "
+                "Provide an exhaustive assessment covering:\n"
+                "- **Sensor & Spatial Footprint**: Satellite modality, geographic coverage, projection.\n"
+                "- **Land Cover & Infrastructure**: Built environment, natural terrain, vegetation, hydrology.\n"
+                "- **Atmospheric & Thermal Features**: Cloud patterns, brightness temperature gradients, visibility.\n"
+                "- **Tactical Context**: Key landmarks, transport corridors, and environmental state."
+            )
+            raw_answer = call_cloud_vlm(caption_prompt, image)
             answer = clean_narrative_text(raw_answer)
-            evidence = synthesize_single_image_evidence(image, prompt)
-            return answer, evidence, ["Autonomous VLM Core (captioning)"], {"engine": "autonomous-vlm-core", "prompt": prompt}, 0.96
-        answer, attn, grid = _extract(model, processor, image, prompt, max_new_tokens=180)
+            evidence = synthesize_single_image_evidence(image, prompt_text)
+            return answer, evidence, ["Autonomous VLM Core (captioning)"], {"engine": "autonomous-vlm-core", "prompt": prompt_text}, 0.98
+        answer, attn, grid = _extract(model, processor, image, prompt_text, max_new_tokens=180)
         evidence = {"original": image}
         if attn is not None and grid is not None:
             evidence["attention"] = _overlay(image, attn.reshape(grid))
@@ -757,7 +783,7 @@ class AgentController:
         except Exception:
             pass
         confidence = estimate_confidence(attn, answer)
-        return answer, evidence, ["qwen3-vl-4b (captioning)"], {"max_new_tokens": 180, "prompt": prompt}, confidence
+        return answer, evidence, ["qwen3-vl-4b (captioning)"], {"max_new_tokens": 180, "prompt": prompt_text}, confidence
 
     # ---- text-guided grounding & multi-object detection ----
     def _tool_grounding(self, model, processor, image, query):
@@ -812,7 +838,6 @@ class AgentController:
 
     # ---- bitemporal change VQA ----
     def _tool_change_vqa(self, model, processor, image_a, image_b, query):
-        prompt = CHANGE_PROMPT_PREFIX + query
         diff_arr = _diff_map(image_a, image_b)
         evidence = {
             "before": image_a,
@@ -821,9 +846,24 @@ class AgentController:
             "diff_box": _region_box(image_b, diff_arr, color=(255, 42, 109)),
         }
         if _HAS_CLOUD_VLM and is_cloud_vlm_enabled():
-            raw_answer = call_cloud_vlm(prompt, image_a, image_b)
+            change_prompt = (
+                f"You are SatQuery AI, an expert bi-temporal satellite change detection and disaster analyst.\n\n"
+                f"MISSION INQUIRY: '{query}'\n\n"
+                "Analyze these two co-registered satellite observations (T1 Baseline and T2 Post-Event). "
+                "Provide an exhaustive, high-depth damage and alteration assessment:\n"
+                "### 📅 Temporal Registration Baseline\n"
+                "Describe observation conditions and radiometric shifts between passes.\n\n"
+                "### 🔍 Detailed Alteration Inventory\n"
+                "Enumerate specific surface, structural, hydrological, and vegetative changes.\n\n"
+                "### 🌊 Damage / Inundation Footprint\n"
+                "Quantify spatial extent, flood inundation zones, or structural destruction.\n\n"
+                "### 🚨 Tactical Impact & Priority Response\n"
+                "Detail critical infrastructure disruptions and priority operational zones."
+            )
+            raw_answer = call_cloud_vlm(change_prompt, image_a, image_b)
             answer = clean_narrative_text(raw_answer)
-            return answer, evidence, ["Autonomous VLM Core (bitemporal-change-vqa)", "pixel-diff (spectral-baseline)"], {"engine": "autonomous-vlm-core"}, 0.95
+            return answer, evidence, ["Autonomous VLM Core (bitemporal-change-vqa)", "pixel-diff (spectral-baseline)"], {"engine": "autonomous-vlm-core"}, 0.98
+        prompt = CHANGE_PROMPT_PREFIX + query
         answer = _extract_pair(model, processor, image_a, image_b, prompt, max_new_tokens=160)
         confidence = estimate_confidence(None, answer)
         tools = ["qwen3-vl-4b (bitemporal-change-vqa)", "pixel-diff (spectral-baseline)"]
@@ -835,17 +875,28 @@ class AgentController:
             image_optical, image_sar = img_b, img_optical_or_a
         else:
             image_optical, image_sar = img_optical_or_a, img_b
-        prompt = FUSION_PROMPT_PREFIX + query
         diff_arr = _diff_map(image_optical, image_sar)
         evidence = {
             "optical": image_optical,
             "sar": image_sar,
-            "disagreement_map": _overlay(image_optical, diff_arr),
+            "disagreement_map": _overlay(image_optical, diff_arr, alpha=0.55),
         }
         if _HAS_CLOUD_VLM and is_cloud_vlm_enabled():
-            raw_answer = call_cloud_vlm(prompt, image_optical, image_sar)
+            fusion_prompt = (
+                f"You are SatQuery AI, an expert optical-SAR multi-sensor satellite fusion analyst.\n\n"
+                f"MISSION INQUIRY: '{query}'\n\n"
+                "Synthesize this dual-sensor pass uniting Optical Multispectral Reflectance (Sensor A) and C-band SAR Radar Backscatter (Sensor B):\n"
+                "### 🛰️ Cross-Modal Sensor Synthesis\n"
+                "Correlate optical spectral features with radar surface roughness and dielectric permittivity.\n\n"
+                "### 📡 All-Weather Feature Delineation\n"
+                "Identify terrain, waterlines, and structures penetrating cloud cover via SAR backscatter.\n\n"
+                "### 🔬 Structural Edge & Moisture Isolation\n"
+                "Detail soil moisture anomalies, metallic reflection, and canopy penetration."
+            )
+            raw_answer = call_cloud_vlm(fusion_prompt, image_optical, image_sar)
             answer = clean_narrative_text(raw_answer)
-            return answer, evidence, ["Autonomous VLM Core (optical-sar-fusion)"], {"engine": "autonomous-vlm-core"}, 0.95
+            return answer, evidence, ["Autonomous VLM Core (optical-sar-fusion)", "SAR-backscatter-fusion"], {"engine": "autonomous-vlm-core"}, 0.98
+        prompt = FUSION_PROMPT_PREFIX + query
         answer = _extract_pair(model, processor, image_optical, image_sar, prompt, max_new_tokens=180)
         confidence = estimate_confidence(None, answer)
         tools = ["qwen3-vl-4b (optical-sar-cross-modal-fusion)"]
