@@ -2,8 +2,8 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'SatQuery AI — Autonomous Orbital Vision-Language Intelligence',
-  description: 'Next-generation geospatial foundation model & agentic VLM for multispectral satellite observation, bitemporal change detection, and SAR fusion.',
+  title: 'AeroLens AI — Autonomous Orbital Vision-Language Intelligence',
+  description: 'AeroLens AI is an advanced multimodal remote sensing foundation model and agentic cockpit for multispectral satellite observation, bitemporal change detection, and SAR fusion.',
 };
 
 export default function RootLayout({
