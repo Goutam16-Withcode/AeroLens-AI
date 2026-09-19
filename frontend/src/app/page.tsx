@@ -39,7 +39,7 @@ export default function GroundStationPage() {
   const [modalityB, setModalityB] = useState<string>('Auto');
 
   const [query, setQuery] = useState<string>(
-    'Describe the land cover, major objects, and overall scene composition in this remote sensing image.'
+    'Execute an exhaustive, high-depth scientific intelligence evaluation of this satellite imagery: synthesize platform telemetry, radiometric channel physics, cloud microphysics, terrestrial geomorphology, and tactical hazard advisories.'
   );
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [response, setResponse] = useState<AnalysisResponse | null>(null);

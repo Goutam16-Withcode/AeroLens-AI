@@ -61,7 +61,7 @@ const FALLBACK_MISSIONS: BenchmarkMission[] = [
     modality_a: 'Optical',
     image_b: null,
     modality_b: 'Auto',
-    query: 'Describe the land cover, major objects, and overall scene composition in this remote sensing image.',
+    query: 'Execute an exhaustive, high-depth scientific intelligence evaluation of this satellite imagery: synthesize platform telemetry, radiometric channel physics, cloud microphysics, terrestrial geomorphology, and tactical hazard advisories.',
   },
 ];
 

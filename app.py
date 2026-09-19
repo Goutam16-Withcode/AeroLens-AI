@@ -722,20 +722,41 @@ class AgentController:
     def _tool_vqa(self, model, processor, image, query):
         if _HAS_CLOUD_VLM and is_cloud_vlm_enabled():
             vqa_prompt = (
-                f"You are SatQuery AI, an elite aerospace remote sensing intelligence analyst and planetary scientist.\n\n"
+                f"You are SatQuery AI, an authoritative senior aerospace remote sensing intelligence analyst and planetary scientist.\n\n"
                 f"MISSION INQUIRY: '{query}'\n\n"
-                "Conduct an exhaustive, high-depth scientific intelligence evaluation of this satellite image. "
-                "Structure your synthesized report with the following detailed technical sections:\n\n"
-                "### 🛰️ Executive Geospatial Summary\n"
-                "Synthesize high-level mission situational awareness, observation timestamp, geographic footprint, and satellite platform/sensor regime.\n\n"
-                "### 🔬 Radiometric & Spectral Channel Analysis\n"
-                "Evaluate the spectral channel characteristics (e.g. Thermal Infrared TIR-1 @ 10.8µm, Water Vapor WV @ 6.9µm, or Multispectral Optical/SWIR). Detail brightness temperature (TB) contrast, radiometric gradients (cold high-altitude white clouds vs warm dark surface terrain), and signal attenuation.\n\n"
-                "### 🌍 Land Cover, Terrestrial & Hydrological Morphology\n"
-                "Provide detailed identification of geographical coastlines, political boundaries, major landmasses, mountain ranges, inland water bodies, and ocean sectors visible across the frame.\n\n"
-                "### ☁️ Atmospheric Dynamics & Cloud System Inventory\n"
-                "Analyze convective storm complexes, cloud-top altitude morphology, frontal squall lines, vorticity circulations, and clear-sky subsidence sectors.\n\n"
-                "### 🎯 Strategic Findings & Tactical Implications\n"
-                "Provide actionable environmental, tactical, or meteorological implications based strictly on observed visual and radiometric evidence."
+                "Execute an exhaustive, high-depth scientific intelligence evaluation of this satellite imagery addressing the inquiry. "
+                "Provide a rigorous, publication-grade dossier structured into the following mandatory sections with quantitative tables and bold metrics:\n\n"
+                "### 🎯 Primary Analytical Finding\n"
+                f"Provide an immediate, direct, high-confidence scientific answer to the mission inquiry: '{query}'. "
+                "Ground your answer in observable spectral signatures, spatial coordinates, and physical radiometric properties.\n\n"
+                "### 🛰️ Synoptic Platform & Sensor Telemetry\n"
+                "Provide a structured Markdown table summarizing:\n"
+                "| Parameter | Sensor Specification / Observed Value |\n"
+                "|---|---|\n"
+                "| Constellation / Mission Platform | (e.g. INSAT-3DS / Sentinel-2 / Landsat-9 / Synthetic / etc.) |\n"
+                "| Sensor Payload & Spectral Band | (e.g. Thermal Infrared TIR-1 10.83 µm, Water Vapor 6.9 µm, VNIR / SWIR) |\n"
+                "| Geographic Coverage & Projection | (e.g. South Asian Subcontinent / Mercator / Lat-Lon Grid) |\n"
+                "| Spatial Resolution / GSD | (Ground sample distance or nadir resolution estimate) |\n"
+                "| Radiometric Regime | (e.g. Calibrated Brightness Temperature Kelvin / TOA Reflectance / Digital Number) |\n"
+                "| Cloud Fraction / Obscuration | (Estimated percentage across visible scene) |\n\n"
+                "### 🔬 Radiometric Calibration & Thermal Gradient Physics\n"
+                "Provide a detailed physical breakdown of radiant emission, reflectance, or backscatter:\n"
+                "- **Brightness Temperature (TB) Gradients**: Detail thermal contrast in Kelvin and Celsius. Explain how cold high-altitude clouds (< 210 K to 240 K / -63°C to -33°C) appear bright white due to minimal infrared radiant flux, mid-level clouds (240 K to 270 K) appear medium gray, and warm land/ocean surfaces (295 K to 315 K / +22°C to +42°C) appear dark.\n"
+                "- **Atmospheric Window & Spectral Transmission**: Discuss radiation propagation through the 10.5–12.5 µm infrared window, limb effects, water vapor absorption, or spectral absorption bands.\n\n"
+                "### ☁️ Cloud Microphysics, Convective Systems & Atmospheric Dynamics\n"
+                "Detail all visible atmospheric systems across the scene:\n"
+                "- **Convective Cores & Deep Storms**: Locate mesoscale convective systems (MCS), cumulonimbus towers, overshooting tops, and anvil cirrus plumes. Provide exact geographic quadrants (e.g. Bay of Bengal, Northeastern India, Arabian Sea, Equatorial Basin).\n"
+                "- **Synoptic Circulation & Vorticity**: Detail upper-level jetstream streaks, cyclonic/anticyclonic vorticity centers, wind shear patterns, and subsidence clear-sky regions.\n\n"
+                "### 🌍 Geomorphic, Hydrological & Terrestrial Morphology\n"
+                "Detail visible terrestrial and maritime features:\n"
+                "- **Coastlines & Maritime Basins**: Peninsular boundaries, ocean sectors (Arabian Sea, Bay of Bengal, Indian Ocean), gulfs, and shelf waters.\n"
+                "- **Continental Landforms & River Systems**: Major river basins (Ganges-Brahmaputra, Indus), plateaus, mountain ranges (e.g. Himalayas, Ghats), and arid deserts.\n"
+                "- **Thermal Inertia & Soil Moisture**: Differentiate diurnal thermal responses between land and water bodies.\n\n"
+                "### 🛡️ Strategic Findings & Operational Hazard Advisories\n"
+                "Provide actionable intelligence for aerospace, maritime, and civil protection stakeholders:\n"
+                "- **Aviation Hazards**: Severe turbulence, cumulonimbus icing zones, and flight level risks.\n"
+                "- **Maritime Operations**: Squall lines, sea-state agitation, and tropical disturbance monitoring.\n"
+                "- **Civil Protection**: Severe weather advisories, flash flood risks, and localized convective storm alerts."
             )
             raw_answer = call_cloud_vlm(vqa_prompt, image)
             answer = clean_narrative_text(raw_answer)
@@ -760,14 +781,39 @@ class AgentController:
         prompt_text = query.strip() if any(k in query.lower() for k in CAPTION_KEYWORDS) else CAPTION_PROMPT
         if _HAS_CLOUD_VLM and is_cloud_vlm_enabled():
             caption_prompt = (
-                f"You are SatQuery AI, an elite aerospace remote sensing intelligence analyst.\n\n"
+                f"You are SatQuery AI, an authoritative senior aerospace remote sensing intelligence analyst and planetary scientist.\n\n"
                 f"MISSION INQUIRY: '{prompt_text}'\n\n"
-                "Generate an in-depth, scientifically rigorous scene caption and terrain intelligence report. "
-                "Provide an exhaustive assessment covering:\n"
-                "- **Sensor & Spatial Footprint**: Satellite modality, geographic coverage, projection.\n"
-                "- **Land Cover & Infrastructure**: Built environment, natural terrain, vegetation, hydrology.\n"
-                "- **Atmospheric & Thermal Features**: Cloud patterns, brightness temperature gradients, visibility.\n"
-                "- **Tactical Context**: Key landmarks, transport corridors, and environmental state."
+                "Conduct an exhaustive, high-depth scientific intelligence evaluation of this satellite imagery. "
+                "Structure your synthesized intelligence report with the following detailed technical sections, quantitative telemetry table, and deep domain analyses:\n\n"
+                "### 🛰️ Synoptic Platform & Sensor Telemetry\n"
+                "Provide a structured Markdown table summarizing:\n"
+                "| Parameter | Sensor Specification / Observed Value |\n"
+                "|---|---|\n"
+                "| Constellation / Mission Platform | (e.g. INSAT-3DS / Sentinel-2 / Landsat-9 / Synthetic / etc.) |\n"
+                "| Sensor Payload & Spectral Channel | (e.g. Thermal Infrared TIR-1 10.83 µm, Water Vapor 6.9 µm, Multispectral Optical) |\n"
+                "| Geographic Coverage & Projection | (e.g. South Asian Subcontinent / Mercator / Global Coordinate Grid) |\n"
+                "| Spatial Resolution / GSD | (Ground sample distance or nadir resolution estimate) |\n"
+                "| Radiometric Calibration Regime | (e.g. Calibrated Brightness Temperature Kelvin / Top-of-Atmosphere Reflectance) |\n"
+                "| Scene Cloud Cover Fraction | (Estimated percentage across visible scene) |\n\n"
+                "### 🔬 Radiometric Calibration & Thermal Gradient Physics\n"
+                "Provide an in-depth physical breakdown of radiant emission, reflectance, or backscatter:\n"
+                "- **Planck Radiance & Brightness Temperature Scale**: Detail the thermal-infrared gradient across the scene. Explain the physical calibration where cold high-altitude clouds (< 210 K to 240 K / -63°C to -33°C) appear bright white due to minimal thermal emission, mid-level clouds (240 K to 270 K) appear light-to-medium gray, and warm land/ocean surfaces (295 K to 315 K / +22°C to +42°C) appear dark charcoal or black.\n"
+                "- **Atmospheric Window & Water Vapor Dynamics**: Explain atmospheric transmission in the 10.5–12.5 µm infrared window, limb darkening, and moisture absorption characteristics across regional airmasses.\n\n"
+                "### ☁️ Cloud Microphysics, Convective Storms & Atmospheric Circulation\n"
+                "Exhaustively inventory and describe all atmospheric phenomena visible across the frame:\n"
+                "- **Mesoscale Convective Systems (MCS)**: Locate and analyze intense convective complexes, deep storm cells, anvil cirrus plumes, and overshooting tops. Identify exact geographic sectors (e.g. Bay of Bengal, Northeastern India, Central Plains, Arabian Sea, Equatorial Intertropical Convergence Zone ITCZ).\n"
+                "- **Stratiform & Low-Level Formations**: Describe marine stratocumulus decks, coastal fog, and fair-weather cumulus fields.\n"
+                "- **Synoptic Upper-Level Dynamics**: Analyze jet stream cirrus streaks, upper-tropospheric troughs, cyclonic or depression vorticity signatures, and subsidence clear-sky regions.\n\n"
+                "### 🌍 Geomorphic, Hydrological & Terrestrial Surface Delineation\n"
+                "Detail all visible landmasses, water bodies, and geographic landmarks:\n"
+                "- **Coastlines & Maritime Basins**: Peninsular margins, Arabian Sea, Bay of Bengal, Indian Ocean, Andaman Sea, Persian Gulf / Gulf of Oman.\n"
+                "- **Continental Landforms & River Basins**: Delineate regional boundaries, Ganges-Brahmaputra delta, Indus basin, Deccan plateau, and orographic signatures along mountain systems (e.g. Himalayas snow-cover/thermal shadow, Western and Eastern Ghats).\n"
+                "- **Surface Thermal Inertia**: Differentiate diurnal thermal response of high heat-capacity oceanic waters versus rapid diurnal heating of arid landmasses (e.g. Thar Desert).\n\n"
+                "### 🎯 Strategic Environmental, Aviation & Maritime Advisories\n"
+                "Provide an actionable operational briefing for stakeholders:\n"
+                "- **Aviation Hazard Warning**: Severe turbulence, cumulonimbus icing zones, and flight level disruption risks along major air traffic corridors.\n"
+                "- **Maritime Operations**: Squall lines, sea-state agitation, tropical depression monitoring, and visibility along shipping lanes.\n"
+                "- **Hydrological & Disaster Alert**: Flash flood potential, heavy localized precipitation footprints, and severe thunderstorm alerts."
             )
             raw_answer = call_cloud_vlm(caption_prompt, image)
             answer = clean_narrative_text(raw_answer)
@@ -791,8 +837,8 @@ class AgentController:
         detected_objects: List[Dict[str, Any]] = []
         if _HAS_CLOUD_VLM and is_cloud_vlm_enabled():
             grounding_prompt = (
-                "You are an expert satellite remote sensing imagery analyst. "
-                "Perform high-precision visual object detection and grounding on this satellite image for: "
+                "You are an expert aerospace remote sensing imagery analyst. "
+                "Perform high-precision visual object detection and visual grounding on this satellite image for: "
                 f"'{query}'.\n\n"
                 "Detect all relevant target objects (e.g. airplanes, storage tanks, ships, buildings, vehicles, runways, water bodies). "
                 "For EACH detected object, output its category label and 2D bounding box [ymin, xmin, ymax, xmax] "
@@ -802,9 +848,14 @@ class AgentController:
                 '  {"label": "airplane", "box_2d": [ymin, xmin, ymax, xmax], "confidence": 0.95},\n'
                 '  {"label": "storage_tank", "box_2d": [ymin, xmin, ymax, xmax], "confidence": 0.92}\n'
                 "]\n"
-                "```\n"
-                "Also provide a scientific description of each detected object, its spatial location (NW, NE, SW, SE, Center), "
-                "and overall scene context."
+                "```\n\n"
+                "After the JSON block, provide an exhaustive, publication-grade intelligence assessment:\n"
+                "### 🎯 Target Detection & Spatial Inventory\n"
+                "Enumerate each identified target with its sub-sector quadrant (NW, NE, SW, SE, Center), estimated dimensions, and orientation.\n\n"
+                "### 🛰️ Facility & Environmental Context\n"
+                "Analyze the surrounding infrastructure, apron/runway geometry, access roadways, natural vegetation, and terrain layout.\n\n"
+                "### 🛡️ Operational Readiness & Tactical Significance\n"
+                "Evaluate operational status, target distribution patterns, and tactical implications."
             )
             raw_answer = call_cloud_vlm(grounding_prompt, image)
             boxed_img, detected_objects = parse_boxes_with_metadata(image, raw_answer)
@@ -848,18 +899,22 @@ class AgentController:
         }
         if _HAS_CLOUD_VLM and is_cloud_vlm_enabled():
             change_prompt = (
-                f"You are SatQuery AI, an expert bi-temporal satellite change detection and disaster analyst.\n\n"
+                f"You are SatQuery AI, an authoritative bi-temporal satellite change detection and disaster analyst.\n\n"
                 f"MISSION INQUIRY: '{query}'\n\n"
                 "Analyze these two co-registered satellite observations (T1 Baseline and T2 Post-Event). "
-                "Provide an exhaustive, high-depth damage and alteration assessment:\n"
-                "### 📅 Temporal Registration Baseline\n"
-                "Describe observation conditions and radiometric shifts between passes.\n\n"
-                "### 🔍 Detailed Alteration Inventory\n"
-                "Enumerate specific surface, structural, hydrological, and vegetative changes.\n\n"
-                "### 🌊 Damage / Inundation Footprint\n"
-                "Quantify spatial extent, flood inundation zones, or structural destruction.\n\n"
-                "### 🚨 Tactical Impact & Priority Response\n"
-                "Detail critical infrastructure disruptions and priority operational zones."
+                "Provide an exhaustive, high-depth damage and alteration assessment with quantitative tables and structured sections:\n\n"
+                "### 🛰️ Observation Baseline & Sensor Telemetry\n"
+                "| Parameter | T1 Baseline | T2 Post-Event | Delta / Shift |\n"
+                "|---|---|---|---|\n"
+                "| Acquisition Regime | Optical / SAR | Optical / SAR | Coregistered |\n"
+                "| Illumination & Cloud Cover | Baseline % | Post-Event % | Shift |\n"
+                "| Surface Condition | Pre-Event | Inundated / Altered | Impact Zone |\n\n"
+                "### 🔍 Detailed Alteration Inventory & Spectral Delineation\n"
+                "Enumerate specific surface, structural, hydrological, and vegetative changes. Correlate visible shifts with spectral indices (NDVI decrease, NDWI increase).\n\n"
+                "### 🌊 Damage / Inundation Footprint & Spatial Extent\n"
+                "Quantify spatial extent, flood inundation zones, structural collapse, or sediment runoff across quadrants.\n\n"
+                "### 🚨 Tactical Impact, Civil Protection & Priority Response\n"
+                "Detail critical infrastructure disruptions, compromised access corridors, and priority operational zones for emergency response."
             )
             raw_answer = call_cloud_vlm(change_prompt, image_a, image_b)
             answer = clean_narrative_text(raw_answer)
@@ -884,15 +939,21 @@ class AgentController:
         }
         if _HAS_CLOUD_VLM and is_cloud_vlm_enabled():
             fusion_prompt = (
-                f"You are SatQuery AI, an expert optical-SAR multi-sensor satellite fusion analyst.\n\n"
+                f"You are SatQuery AI, an authoritative optical-SAR multi-sensor satellite fusion analyst.\n\n"
                 f"MISSION INQUIRY: '{query}'\n\n"
-                "Synthesize this dual-sensor pass uniting Optical Multispectral Reflectance (Sensor A) and C-band SAR Radar Backscatter (Sensor B):\n"
-                "### 🛰️ Cross-Modal Sensor Synthesis\n"
-                "Correlate optical spectral features with radar surface roughness and dielectric permittivity.\n\n"
-                "### 📡 All-Weather Feature Delineation\n"
-                "Identify terrain, waterlines, and structures penetrating cloud cover via SAR backscatter.\n\n"
-                "### 🔬 Structural Edge & Moisture Isolation\n"
-                "Detail soil moisture anomalies, metallic reflection, and canopy penetration."
+                "Synthesize this dual-sensor pass uniting Optical Multispectral Reflectance (Sensor A) and C-band SAR Radar Backscatter (Sensor B) "
+                "into an exhaustive cross-modal intelligence briefing:\n\n"
+                "### 🛰️ Multi-Sensor Telemetry & Channel Characteristics\n"
+                "| Channel | Spectral / Microwave Modality | Penetration & Sensitivity |\n"
+                "|---|---|---|\n"
+                "| Sensor A (Optical) | Visible / SWIR Reflectance | Sensitive to pigment, moisture, cloud-attenuated |\n"
+                "| Sensor B (SAR) | C-Band Active Microwave (5.4 GHz) | All-weather, cloud-penetrating, dielectric & roughness |\n\n"
+                "### 📡 All-Weather Feature Delineation & Cloud Penetration\n"
+                "Correlate optical spectral features with radar surface roughness and dielectric permittivity. Detail ground features obscured by cloud in optical that are revealed by SAR.\n\n"
+                "### 🔬 Structural Double-Bounce & Moisture Anomalies\n"
+                "Detail strong corner reflectors (urban buildings, vessels, infrastructure) versus smooth specular surfaces (calm water) and volumetric canopy scattering.\n\n"
+                "### 🛡️ Tactical Synthesis & Joint-Modality Confidence\n"
+                "Provide joint assessment of terrain, trafficability, and facility status with unified multi-sensor confidence."
             )
             raw_answer = call_cloud_vlm(fusion_prompt, image_optical, image_sar)
             answer = clean_narrative_text(raw_answer)

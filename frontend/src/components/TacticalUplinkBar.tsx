@@ -45,9 +45,9 @@ export const TacticalUplinkBar: React.FC<TacticalUplinkBarProps> = ({
     },
     {
       id: 'caption',
-      label: 'Land-Cover Caption',
-      badge: '1x SCENE',
-      prompt: 'Describe the land cover, major objects, and overall scene composition in this remote sensing image.',
+      label: 'Deep Scene Intelligence',
+      badge: 'ORBITAL DOSSIER',
+      prompt: 'Execute an exhaustive, high-depth scientific intelligence evaluation of this satellite imagery: synthesize platform telemetry, radiometric channel physics, cloud microphysics, terrestrial geomorphology, and tactical hazard advisories.',
       modalityA: 'Optical',
       reqSecondImage: false,
       icon: (
