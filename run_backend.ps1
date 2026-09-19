@@ -1,6 +1,6 @@
-# SatQuery AI - FastAPI Backend Launcher
+# AeroLens AI - FastAPI Backend Launcher
 Write-Host "============================================================" -ForegroundColor Cyan
-Write-Host " Starting SatQuery AI Backend Server (FastAPI + Uvicorn)" -ForegroundColor Cyan
+Write-Host " Starting AeroLens AI Backend Server (FastAPI + Uvicorn)" -ForegroundColor Cyan
 Write-Host " Endpoint: http://localhost:8000" -ForegroundColor Green
 Write-Host "============================================================" -ForegroundColor Cyan
 

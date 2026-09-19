@@ -108,7 +108,7 @@ python -m venv venv
 .\venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 
-# Start the SatQuery AI API server
+# Start the AeroLens AI API server
 uvicorn src.satquery.api.server:app --host 0.0.0.0 --port 8000 --reload
 ```
 
@@ -118,7 +118,7 @@ python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 
-# Start the SatQuery AI API server
+# Start the AeroLens AI API server
 uvicorn src.satquery.api.server:app --host 0.0.0.0 --port 8000 --reload
 ```
 
@@ -142,7 +142,7 @@ Open your browser and navigate to **`http://localhost:3000`**.
 
 ## 🐳 Docker & Container Orchestration
 
-Run the complete SatQuery AI cockpit with a single command:
+Run the complete AeroLens AI cockpit with a single command:
 
 ```bash
 docker compose up -d --build
@@ -221,4 +221,4 @@ pytest tests/ -v
 
 ## 📄 License
 
-SatQuery AI is open-source software licensed under the [MIT License](LICENSE).
+AeroLens AI is open-source software licensed under the [MIT License](LICENSE).
