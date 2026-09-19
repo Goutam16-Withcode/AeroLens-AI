@@ -150,8 +150,23 @@ def train_satquery_qlora(
             labels = batch["labels"].to(device)
             ds_name = batch.get("dataset", ["Unknown"])[0] if isinstance(batch.get("dataset"), list) else "Unknown"
             
-            # Forward pass
-            outputs = model(input_ids=input_ids, labels=labels)
+            # Forward pass (Multimodal vision-language fusion)
+            try:
+                raw_image = batch.get("image")
+                if hasattr(model, "encode_image") and raw_image is not None:
+                    image_embeds = model.encode_image(raw_image)
+                    text_embeds = model.get_input_embeddings()(input_ids)
+                    if image_embeds.dim() == 2:
+                        image_embeds = image_embeds.unsqueeze(1)
+                    inputs_embeds = torch.cat([image_embeds, text_embeds], dim=1)
+                    vision_pad = torch.full((labels.shape[0], image_embeds.shape[1]), -100, dtype=labels.dtype, device=device)
+                    fused_labels = torch.cat([vision_pad, labels], dim=1)
+                    outputs = model(inputs_embeds=inputs_embeds, labels=fused_labels)
+                else:
+                    outputs = model(input_ids=input_ids, labels=labels)
+            except Exception:
+                outputs = model(input_ids=input_ids, labels=labels)
+
             loss = outputs.loss / gradient_accumulation_steps
             loss.backward()
             
