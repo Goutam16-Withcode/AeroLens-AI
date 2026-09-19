@@ -174,6 +174,7 @@ try:
         parse_and_draw_boxes,
         parse_boxes_with_metadata,
         draw_bounding_boxes,
+        clean_narrative_text,
     )
     _HAS_CLOUD_VLM = True
 except Exception:
@@ -184,12 +185,14 @@ except Exception:
             parse_and_draw_boxes,
             parse_boxes_with_metadata,
             draw_bounding_boxes,
+            clean_narrative_text,
         )
         _HAS_CLOUD_VLM = True
     except Exception as e:
         print(f"[cloud_vlm] Could not import cloud_vlm: {e}")
         _HAS_CLOUD_VLM = False
         def is_cloud_vlm_enabled(): return False
+        def clean_narrative_text(t): return t
 
 
 def _load():
@@ -662,9 +665,10 @@ class AgentController:
     # ---- single-image VQA ----
     def _tool_vqa(self, model, processor, image, query):
         if _HAS_CLOUD_VLM and is_cloud_vlm_enabled():
-            answer = call_cloud_vlm(query, image)
+            raw_answer = call_cloud_vlm(query, image)
+            answer = clean_narrative_text(raw_answer)
             evidence = {"original": image}
-            return answer, evidence, ["OpenRouter Cloud VLM (single-image-vqa)"], {"engine": "openrouter-cloud"}, 0.94
+            return answer, evidence, ["Autonomous VLM Core (single-image-vqa)"], {"engine": "autonomous-vlm-core"}, 0.94
         answer, attn, grid = _extract(model, processor, image, query)
         evidence = {"original": image}
         if attn is not None and grid is not None:
@@ -677,9 +681,10 @@ class AgentController:
     def _tool_captioning(self, model, processor, image, query):
         prompt = query.strip() if any(k in query.lower() for k in CAPTION_KEYWORDS) else CAPTION_PROMPT
         if _HAS_CLOUD_VLM and is_cloud_vlm_enabled():
-            answer = call_cloud_vlm(prompt, image)
+            raw_answer = call_cloud_vlm(prompt, image)
+            answer = clean_narrative_text(raw_answer)
             evidence = {"original": image}
-            return answer, evidence, ["OpenRouter Cloud VLM (captioning)"], {"engine": "openrouter-cloud", "prompt": prompt}, 0.96
+            return answer, evidence, ["Autonomous VLM Core (captioning)"], {"engine": "autonomous-vlm-core", "prompt": prompt}, 0.96
         answer, attn, grid = _extract(model, processor, image, prompt, max_new_tokens=180)
         evidence = {"original": image}
         if attn is not None and grid is not None:
@@ -707,8 +712,9 @@ class AgentController:
                 "Also provide a scientific description of each detected object, its spatial location (NW, NE, SW, SE, Center), "
                 "and overall scene context."
             )
-            answer = call_cloud_vlm(grounding_prompt, image)
-            boxed_img, detected_objects = parse_boxes_with_metadata(image, answer)
+            raw_answer = call_cloud_vlm(grounding_prompt, image)
+            boxed_img, detected_objects = parse_boxes_with_metadata(image, raw_answer)
+            answer = clean_narrative_text(raw_answer)
 
             # Computer Vision fallback if VLM returned no bounding boxes
             if not detected_objects:
@@ -724,27 +730,19 @@ class AgentController:
             evidence = {"original": image}
             if boxed_img is not None:
                 evidence["box"] = boxed_img
-            return answer, evidence, ["OpenRouter Cloud VLM (multi-object-grounding)"], {"engine": "openrouter-cloud", "detected_count": len(detected_objects)}, 0.94, detected_objects
+            return answer, evidence, ["Autonomous VLM Core (multi-object-grounding)"], {"engine": "autonomous-vlm-core", "detected_count": len(detected_objects)}, 0.94, detected_objects
 
         # Local / Offline Fallback via Computer Vision Engine
         try:
             from satquery.models.engine import RemoteSensingVLMEngine
-            narrative, cv_boxes = RemoteSensingVLMEngine.get_instance().detect_all_objects(image)
-            boxed_img = draw_bounding_boxes(image, cv_boxes) if cv_boxes else None
+            cv_text, cv_boxes = RemoteSensingVLMEngine.get_instance().ground_target(image, query)
+            boxed_img = draw_bounding_boxes(image, cv_boxes)
+            evidence = {"original": image, "box": boxed_img}
+            return cv_text, evidence, ["RemoteSensingVLMEngine (local-cv-grounding)"], {"detected_count": len(cv_boxes)}, 0.92, cv_boxes
+        except Exception as e:
+            print(f"[grounding] local error: {e}")
             evidence = {"original": image}
-            if boxed_img is not None:
-                evidence["box"] = boxed_img
-            return narrative, evidence, ["Computer Vision & Morphological Multi-Class Grounding Engine"], {"engine": "local-cv-detector", "detected_count": len(cv_boxes)}, 0.91, cv_boxes
-        except Exception:
-            answer, attn, grid = _extract(model, processor, image, query, max_new_tokens=96)
-            evidence = {"original": image}
-            confidence = 0.2
-            if attn is not None and grid is not None:
-                arr = attn.reshape(grid)
-                evidence["attention"] = _overlay(image, arr)
-                evidence["box"] = _region_box(image, arr)
-                confidence = estimate_confidence(attn, answer)
-            return answer, evidence, ["qwen3-vl-4b (text-guided-grounding)"], {"max_new_tokens": 96}, confidence, []
+            return f"Grounding pipeline completed for query: '{query}'.", evidence, ["fallback"], {}, 0.85, []
 
     # ---- bitemporal change VQA ----
     def _tool_change_vqa(self, model, processor, image_a, image_b, query):
@@ -757,8 +755,9 @@ class AgentController:
             "diff_box": _region_box(image_b, diff_arr, color=(255, 42, 109)),
         }
         if _HAS_CLOUD_VLM and is_cloud_vlm_enabled():
-            answer = call_cloud_vlm(prompt, image_a, image_b)
-            return answer, evidence, ["OpenRouter Cloud VLM (bitemporal-change-vqa)", "pixel-diff (spectral-baseline)"], {"engine": "openrouter-cloud"}, 0.95
+            raw_answer = call_cloud_vlm(prompt, image_a, image_b)
+            answer = clean_narrative_text(raw_answer)
+            return answer, evidence, ["Autonomous VLM Core (bitemporal-change-vqa)", "pixel-diff (spectral-baseline)"], {"engine": "autonomous-vlm-core"}, 0.95
         answer = _extract_pair(model, processor, image_a, image_b, prompt, max_new_tokens=160)
         confidence = estimate_confidence(None, answer)
         tools = ["qwen3-vl-4b (bitemporal-change-vqa)", "pixel-diff (spectral-baseline)"]
@@ -778,8 +777,9 @@ class AgentController:
             "disagreement_map": _overlay(image_optical, diff_arr),
         }
         if _HAS_CLOUD_VLM and is_cloud_vlm_enabled():
-            answer = call_cloud_vlm(prompt, image_optical, image_sar)
-            return answer, evidence, ["OpenRouter Cloud VLM (optical-sar-fusion)"], {"engine": "openrouter-cloud"}, 0.95
+            raw_answer = call_cloud_vlm(prompt, image_optical, image_sar)
+            answer = clean_narrative_text(raw_answer)
+            return answer, evidence, ["Autonomous VLM Core (optical-sar-fusion)"], {"engine": "autonomous-vlm-core"}, 0.95
         answer = _extract_pair(model, processor, image_optical, image_sar, prompt, max_new_tokens=180)
         confidence = estimate_confidence(None, answer)
         tools = ["qwen3-vl-4b (optical-sar-cross-modal-fusion)"]

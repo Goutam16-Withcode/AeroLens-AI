@@ -16,21 +16,32 @@ export const VlmSynthesisTerminal: React.FC<VlmSynthesisTerminalProps> = ({
   const [copied, setCopied] = useState(false);
   const [speaking, setSpeaking] = useState(false);
 
+  const formatReportText = (text: string | null) => {
+    if (!text) return '';
+    return text
+      .replace(/```(?:json)?\s*\[[\s\S]*?\]\s*```\s*/gi, '')
+      .replace(/^\s*\[\s*\{[\s\S]*?\}\s*\]\s*/g, '')
+      .replace(/```(?:json)?\s*```/gi, '')
+      .trim();
+  };
+
+  const cleanAnswer = formatReportText(answer);
+
   const handleCopy = () => {
-    if (!answer) return;
-    navigator.clipboard.writeText(answer);
+    if (!cleanAnswer) return;
+    navigator.clipboard.writeText(cleanAnswer);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
   const handleSpeak = () => {
-    if (!answer) return;
+    if (!cleanAnswer) return;
     if (speaking) {
       window.speechSynthesis?.cancel();
       setSpeaking(false);
       return;
     }
-    const utterance = new SpeechSynthesisUtterance(answer);
+    const utterance = new SpeechSynthesisUtterance(cleanAnswer);
     utterance.rate = 1.05;
     utterance.onend = () => setSpeaking(false);
     window.speechSynthesis?.speak(utterance);
@@ -173,8 +184,10 @@ export const VlmSynthesisTerminal: React.FC<VlmSynthesisTerminalProps> = ({
               Autonomous VLM neural reasoning in progress... Synthesizing multi-spectral downlink...
             </span>
           </div>
-        ) : answer ? (
-          <div className="intel-text">{answer}</div>
+        ) : cleanAnswer ? (
+          <div className="intel-text" style={{ whiteSpace: 'pre-wrap', lineHeight: '1.65' }}>
+            {cleanAnswer}
+          </div>
         ) : (
           <div style={{ color: 'var(--text-muted)', fontSize: '12.5px', fontStyle: 'italic' }}>
             Telemetry standby. Ingest sensor swath and uplink mission inquiry to generate orbital intelligence.

@@ -156,22 +156,32 @@ def extract_bounding_boxes(text: str, w: int, h: int) -> List[Dict[str, Any]]:
 
                         if "box_2d" in item and isinstance(item["box_2d"], list) and len(item["box_2d"]) == 4:
                             coords = [float(x) for x in item["box_2d"]]
+                        elif "box" in item and isinstance(item["box"], list) and len(item["box"]) == 4:
+                            coords = [float(x) for x in item["box"]]
                         elif "bbox" in item and isinstance(item["bbox"], list) and len(item["bbox"]) == 4:
                             coords = [float(x) for x in item["bbox"]]
                         elif all(k in item for k in ("ymin", "xmin", "ymax", "xmax")):
                             coords = [float(item["ymin"]), float(item["xmin"]), float(item["ymax"]), float(item["xmax"])]
 
+                        label_str = str(label).strip()
+                        # Discard prompt echoes or entire-scene bounding hallucinations
+                        if len(label_str) > 35 or any(p in label_str.lower() for p in ("describe", "locate", "what", "how many", "is there", "remote sensing", "composition")):
+                            continue
+
                         if coords:
                             xmin, ymin, xmax, ymax = _normalize_box(coords, w, h)
+                            # Reject whole-frame boxes that span >90% of the image (scene prompt echo)
+                            if (xmax - xmin) >= 0.90 * w and (ymax - ymin) >= 0.90 * h:
+                                continue
                             if (xmax - xmin) > 4 and (ymax - ymin) > 4:
                                 key = (xmin // 4, ymin // 4, xmax // 4, ymax // 4)
                                 if key not in seen_boxes:
                                     seen_boxes.add(key)
-                                    color = get_category_color(label)
+                                    color = get_category_color(label_str)
                                     results.append({
                                         "id": f"det_{len(results) + 1}",
-                                        "label": str(label).strip(),
-                                        "category": str(label).strip().title(),
+                                        "label": label_str,
+                                        "category": label_str.title(),
                                         "confidence": round(conf, 2),
                                         "xmin": round(xmin / w, 4),
                                         "ymin": round(ymin / h, 4),
@@ -340,6 +350,20 @@ def parse_and_draw_boxes(img: Image.Image, text: str) -> Optional[Image.Image]:
     if not bboxes:
         return None
     return draw_bounding_boxes(img, bboxes)
+
+
+def clean_narrative_text(text: str) -> str:
+    """Strip raw bounding box JSON codeblocks and whole-image hallucinated prompt echoes
+    from the natural language report, ensuring clean, professional Markdown output."""
+    if not text:
+        return ""
+    # Remove ```json [ ... ] ``` or ``` [ ... ] ``` blocks
+    cleaned = re.sub(r"```(?:json)?\s*\[[\s\S]*?\]\s*```\s*", "", text, flags=re.IGNORECASE)
+    # Remove leading standalone [ { ... } ] arrays if at the beginning of the text
+    cleaned = re.sub(r"^\s*\[\s*\{[\s\S]*?\}\s*\]\s*", "", cleaned)
+    # Remove empty markdown code blocks
+    cleaned = re.sub(r"```(?:json)?\s*```", "", cleaned, flags=re.IGNORECASE)
+    return cleaned.strip()
 
 
 def parse_boxes_with_metadata(img: Image.Image, text: str) -> Tuple[Optional[Image.Image], List[Dict[str, Any]]]:
