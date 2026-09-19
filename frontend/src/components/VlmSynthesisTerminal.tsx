@@ -170,7 +170,7 @@ export const VlmSynthesisTerminal: React.FC<VlmSynthesisTerminalProps> = ({
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--accent-amber)', padding: '6px 0' }}>
             <div className="pulse-dot" style={{ background: 'var(--accent-amber)' }} />
             <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px' }}>
-              Qwen3-VL neural reasoning in progress... Synthesizing multi-spectral downlink...
+              Autonomous VLM neural reasoning in progress... Synthesizing multi-spectral downlink...
             </span>
           </div>
         ) : answer ? (

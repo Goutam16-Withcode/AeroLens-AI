@@ -115,8 +115,81 @@ export const TacticalUplinkBar: React.FC<TacticalUplinkBarProps> = ({
           <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
         </svg>
       ),
+    {
+      id: 'wildfire',
+      label: 'Wildfire Burn Scar',
+      badge: 'DISASTER',
+      prompt: 'Identify and evaluate burned vegetation, fire perimeters, and active burn scars in this remote sensing swath.',
+      modalityA: 'Optical',
+      reqSecondImage: false,
+      icon: (
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" />
+        </svg>
+      ),
+    },
+    {
+      id: 'maritime',
+      label: 'Maritime Harbor Fleet',
+      badge: 'MARITIME',
+      prompt: 'Detect and count all naval vessels, cargo ships, docks, and piers in this coastal maritime corridor.',
+      modalityA: 'Optical',
+      reqSecondImage: false,
+      icon: (
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M2 20a2.4 2.4 0 0 0 2 1 2.4 2.4 0 0 0 2-1 2.4 2.4 0 0 1 2-1 2.4 2.4 0 0 1 2 1 2.4 2.4 0 0 0 2 1 2.4 2.4 0 0 0 2-1 2.4 2.4 0 0 1 2-1 2.4 2.4 0 0 1 2 1 2.4 2.4 0 0 0 2 1 2.4 2.4 0 0 0 2-1" />
+          <path d="M4 18L3 12h18l-1 6" />
+          <path d="M12 4v8" />
+          <path d="M8 8l4-4 4 4" />
+        </svg>
+      ),
     },
   ];
+
+  const [isListening, setIsListening] = React.useState<boolean>(false);
+
+  const toggleVoiceInput = () => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert('Speech Recognition API is not supported in this browser. Please use Chrome, Edge, or Safari.');
+      return;
+    }
+
+    if (isListening) {
+      setIsListening(false);
+      return;
+    }
+
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.lang = 'en-US';
+
+      recognition.onstart = () => {
+        setIsListening(true);
+      };
+
+      recognition.onresult = (event: any) => {
+        const transcript = event.results[0][0].transcript;
+        if (transcript) {
+          setQuery(transcript);
+        }
+      };
+
+      recognition.onerror = () => {
+        setIsListening(false);
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+      };
+
+      recognition.start();
+    } catch {
+      setIsListening(false);
+    }
+  };
 
   const handleChipClick = (chip: PresetChip) => {
     setQuery(chip.prompt);
@@ -135,7 +208,36 @@ export const TacticalUplinkBar: React.FC<TacticalUplinkBarProps> = ({
           </svg>
           <span>MISSION OBJECTIVE UPLINK</span>
         </div>
-        <span className="panel-title-tag">INTELLIGENT TOOL PRESETS</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <button
+            onClick={toggleVoiceInput}
+            title={isListening ? 'Stop listening' : 'Speak query hands-free via microphone'}
+            style={{
+              padding: '3px 8px',
+              background: isListening ? '#fef2f2' : '#ffffff',
+              border: `1px solid ${isListening ? '#ef4444' : 'var(--border-subtle)'}`,
+              color: isListening ? '#ef4444' : 'var(--text-secondary)',
+              borderRadius: '4px',
+              fontFamily: 'var(--font-mono)',
+              fontSize: '10px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              transition: 'all 0.15s ease',
+            }}
+          >
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+              <line x1="12" y1="19" x2="12" y2="23" />
+              <line x1="8" y1="23" x2="16" y2="23" />
+            </svg>
+            <span>{isListening ? '● LISTENING...' : 'VOICE MIC'}</span>
+          </button>
+          <span className="panel-title-tag">INTELLIGENT TOOL PRESETS</span>
+        </div>
       </div>
 
       <div className="preset-chips-container">

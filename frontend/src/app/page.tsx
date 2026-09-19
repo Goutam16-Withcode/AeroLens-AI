@@ -126,6 +126,12 @@ export default function GroundStationPage() {
       }
     } else if (presetId === 'caption') {
       setActiveTab('matrix');
+    } else if (presetId === 'wildfire') {
+      setModalityA('Optical');
+      setActiveTab('indices');
+    } else if (presetId === 'maritime') {
+      setModalityA('Optical');
+      setActiveTab('objects');
     }
   };
 
