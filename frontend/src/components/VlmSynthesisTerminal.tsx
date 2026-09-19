@@ -185,8 +185,125 @@ export const VlmSynthesisTerminal: React.FC<VlmSynthesisTerminalProps> = ({
             </span>
           </div>
         ) : cleanAnswer ? (
-          <div className="intel-text" style={{ whiteSpace: 'pre-wrap', lineHeight: '1.65' }}>
-            {cleanAnswer}
+          <div className="intel-text" style={{ fontSize: '12.5px', lineHeight: '1.7', color: 'var(--text-primary)' }}>
+            {cleanAnswer.split('\n\n').map((block, idx) => {
+              const trimmed = block.trim();
+              if (trimmed.startsWith('# ') || trimmed.startsWith('## ') || trimmed.startsWith('### ')) {
+                const headerText = trimmed.replace(/^#+\s*/, '');
+                return (
+                  <div
+                    key={idx}
+                    style={{
+                      fontFamily: 'var(--font-hud)',
+                      fontSize: trimmed.startsWith('# ') ? '15px' : '13.5px',
+                      fontWeight: 700,
+                      color: 'var(--text-pure)',
+                      marginTop: idx === 0 ? '0px' : '16px',
+                      marginBottom: '8px',
+                      paddingBottom: '4px',
+                      borderBottom: '1px solid var(--border-subtle)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                    }}
+                  >
+                    <span style={{ width: '3px', height: '14px', background: 'var(--accent-amber)', borderRadius: '2px', display: 'inline-block' }} />
+                    <span>{headerText}</span>
+                  </div>
+                );
+              }
+              if (trimmed.startsWith('|') && trimmed.includes('|---')) {
+                const rows = trimmed.split('\n').filter((r) => r.trim().startsWith('|'));
+                if (rows.length >= 2) {
+                  const headerCols = rows[0].split('|').map((c) => c.trim()).filter(Boolean);
+                  const bodyRows = rows.slice(2).map((r) => r.split('|').map((c) => c.trim()).filter(Boolean));
+                  return (
+                    <div key={idx} style={{ overflowX: 'auto', margin: '10px 0' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px', fontFamily: 'var(--font-mono)' }}>
+                        <thead>
+                          <tr style={{ background: '#f5efe6', borderBottom: '1.5px solid var(--border-subtle)' }}>
+                            {headerCols.map((c, i) => (
+                              <th key={i} style={{ padding: '6px 10px', textAlign: 'left', fontWeight: 700, color: 'var(--text-secondary)' }}>
+                                {c}
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {bodyRows.map((r, ri) => (
+                            <tr key={ri} style={{ borderBottom: '1px solid var(--border-light)' }}>
+                              {r.map((cell, ci) => (
+                                <td key={ci} style={{ padding: '5px 10px', color: 'var(--text-primary)' }}>
+                                  {cell.replace(/\*\*/g, '')}
+                                </td>
+                              ))}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  );
+                }
+              }
+              if (trimmed.startsWith('>')) {
+                return (
+                  <div
+                    key={idx}
+                    style={{
+                      borderLeft: '3px solid var(--accent-amber)',
+                      background: '#faf6f0',
+                      padding: '8px 12px',
+                      borderRadius: '0 6px 6px 0',
+                      margin: '10px 0',
+                      fontStyle: 'italic',
+                      fontSize: '11.5px',
+                    }}
+                  >
+                    {trimmed.replace(/^>\s*/, '')}
+                  </div>
+                );
+              }
+              // Normal paragraphs & bullet lists
+              const lines = trimmed.split('\n');
+              return (
+                <div key={idx} style={{ marginBottom: '10px' }}>
+                  {lines.map((line, li) => {
+                    const lineTrim = line.trim();
+                    const isBullet = lineTrim.startsWith('- ') || lineTrim.startsWith('* ') || lineTrim.startsWith('• ');
+                    const content = isBullet ? lineTrim.replace(/^[-*•]\s*/, '') : line;
+                    return (
+                      <div
+                        key={li}
+                        style={{
+                          display: isBullet ? 'flex' : 'block',
+                          alignItems: 'baseline',
+                          gap: isBullet ? '8px' : '0px',
+                          marginBottom: '4px',
+                        }}
+                      >
+                        {isBullet && (
+                          <span style={{ color: 'var(--accent-amber)', fontSize: '14px', lineHeight: '1' }}>
+                            •
+                          </span>
+                        )}
+                        <span>
+                          {content.split(/(\*\*.*?\*\*)/g).map((part, pi) => {
+                            if (part.startsWith('**') && part.endsWith('**')) {
+                              return (
+                                <strong key={pi} style={{ color: 'var(--text-pure)', fontWeight: 700 }}>
+                                  {part.slice(2, -2)}
+                                </strong>
+                              );
+                            }
+                            return part;
+                          })}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })}
           </div>
         ) : (
           <div style={{ color: 'var(--text-muted)', fontSize: '12.5px', fontStyle: 'italic' }}>
