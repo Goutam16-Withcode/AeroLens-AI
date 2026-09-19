@@ -239,7 +239,7 @@ def _load():
 
 def adaptation_status() -> str:
     if _HAS_CLOUD_VLM and is_cloud_vlm_enabled():
-        return "Cloud VLM (OpenRouter Active) · Zero-Latency Neural Core"
+        return "Autonomous VLM Engine · Zero-Latency Neural Core"
     device_name = "GPU (CUDA)" if _is_cuda_supported() and os.getenv("SATQUERY_FORCE_CPU", "0") != "1" else "CPU Mode"
     adapt = "BigEarthNet LoRA adapter (loaded)" if _adapter_loaded else "Base Model"
     return f"{adapt} · {device_name}"

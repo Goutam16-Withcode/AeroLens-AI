@@ -23,7 +23,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
 DEFAULT_MODEL = os.getenv("OPENROUTER_MODEL", "inclusionai/ling-3.0-flash-vl:free")
-API_KEY = os.getenv("OPENROUTER_API_KEY", "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")
+API_KEY = os.getenv("OPENROUTER_API_KEY", "")
 
 # Aerospace Multi-Class Color Palette (RGBA & HEX)
 CATEGORY_COLORS: Dict[str, Tuple[int, int, int]] = {
@@ -67,12 +67,24 @@ def get_category_color(label: str) -> Tuple[int, int, int]:
 
 def get_api_key() -> str:
     key = os.getenv("OPENROUTER_API_KEY", "").strip()
-    if not key and os.path.exists(".env"):
-        with open(".env", "r") as f:
-            for line in f:
-                if line.startswith("OPENROUTER_API_KEY="):
-                    key = line.split("=", 1)[1].strip()
-                    break
+    if not key:
+        candidate_paths = [
+            Path(".env"),
+            Path(__file__).resolve().parents[3] / ".env",
+            Path(__file__).resolve().parents[2] / ".env",
+            Path(__file__).resolve().parents[1] / ".env",
+        ]
+        for env_path in candidate_paths:
+            if env_path.exists():
+                try:
+                    with open(env_path, "r", encoding="utf-8") as f:
+                        for line in f:
+                            if line.strip().startswith("OPENROUTER_API_KEY="):
+                                parsed_key = line.strip().split("=", 1)[1].strip().strip('"').strip("'")
+                                if parsed_key:
+                                    return parsed_key
+                except Exception:
+                    pass
     return key or API_KEY
 
 

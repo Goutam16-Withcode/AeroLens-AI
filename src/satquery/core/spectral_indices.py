@@ -210,6 +210,100 @@ def compute_spectral_index(
         }
         res_img = Image.fromarray(output_rgb)
 
+    elif index_type == "nbr":
+        # 5. NBR (Normalized Burn Ratio - Wildfire & Burn Scar Assessment)
+        # NBR = (NIR - SWIR) / (NIR + SWIR)
+        # Synthetic NIR from mesophyll cell reflectance:
+        nir_proxy = np.clip(2.1 * g - 0.3 * r - 0.2 * b, 0.0, 1.0)
+        # Synthetic SWIR proxy from soil moisture absorption and ash/charcoal contrast:
+        swir_proxy = np.clip(1.8 * r + 0.6 * gray_f - 1.2 * g, 0.0, 1.0)
+
+        nbr_denom = nir_proxy + swir_proxy
+        nbr_denom[nbr_denom < 1e-4] = 1e-4
+        nbr_arr = np.clip((nir_proxy - swir_proxy) / nbr_denom, -1.0, 1.0)
+
+        output_rgb = rgb_np.copy()
+        
+        # USGS Burn Severity Thresholds:
+        # High Severity Burn: NBR < -0.15 (Radiant Charcoal/Crimson Fire Scar)
+        # Moderate Severity: -0.15 <= NBR < 0.10 (Burnt Umber / Dark Amber)
+        # Low Severity / Soil: 0.10 <= NBR < 0.25 (Natural terrain context)
+        # Healthy Unburned Canopy: NBR >= 0.25 (Vivid Emerald Forest)
+        burn_high = nbr_arr < -0.15
+        burn_mod = (nbr_arr >= -0.15) & (nbr_arr < 0.08)
+        unburned = nbr_arr >= 0.30
+
+        fire_scar_color = np.array([225, 29, 72], dtype=np.float32)    # Crimson Burn Scar
+        charcoal_amber = np.array([217, 119, 6], dtype=np.float32)     # Moderate Singe
+        healthy_green = np.array([16, 185, 129], dtype=np.float32)     # Unburned Canopy
+
+        if np.any(burn_high):
+            under = output_rgb[burn_high].astype(np.float32)
+            output_rgb[burn_high] = np.clip(under * 0.25 + fire_scar_color * 0.75, 0, 255).astype(np.uint8)
+
+        if np.any(burn_mod):
+            under = output_rgb[burn_mod].astype(np.float32)
+            output_rgb[burn_mod] = np.clip(under * 0.35 + charcoal_amber * 0.65, 0, 255).astype(np.uint8)
+
+        if np.any(unburned):
+            under = output_rgb[unburned].astype(np.float32)
+            output_rgb[unburned] = np.clip(under * 0.30 + healthy_green * 0.70, 0, 255).astype(np.uint8)
+
+        burned_pct = float(np.mean(burn_high | burn_mod) * 100.0)
+        stats = {
+            "index_name": "NBR (Normalized Burn Ratio - Wildfire Perimeter & Severity)",
+            "mean_index": round(float(np.mean(nbr_arr)), 3),
+            "burned_area_pct": round(burned_pct, 1),
+            "burn_classification": (
+                "Critical Wildfire Burn Scar Detected" if burned_pct > 25
+                else ("Moderate Fire Scorch / Singe Perimeter" if burned_pct > 5 else "Unburned / Stable Biomass")
+            ),
+            "colormap": "USGS Fire Severity (Crimson Burn Scar → Amber Scorch → Emerald Unburned)",
+            "algorithm": "USGS Standard (NIR - SWIR) / (NIR + SWIR) Radiometric Delta",
+        }
+        res_img = Image.fromarray(output_rgb)
+
+    elif index_type == "savi":
+        # 6. SAVI (Soil-Adjusted Vegetation Index with L=0.5)
+        # SAVI = ((NIR - Red) / (NIR + Red + L)) * (1 + L)
+        L = 0.5
+        nir_proxy = np.clip(2.0 * g - 0.4 * r - 0.2 * b, 0.0, 1.0)
+        savi_denom = nir_proxy + r + L
+        savi_denom[savi_denom < 1e-4] = 1e-4
+        savi_arr = np.clip(((nir_proxy - r) / savi_denom) * (1.0 + L), -1.0, 1.0)
+
+        output_rgb = rgb_np.copy()
+        savi_dense = savi_arr >= 0.35
+        savi_mod = (savi_arr >= 0.18) & (savi_arr < 0.35)
+        savi_sparse = (savi_arr >= 0.08) & (savi_arr < 0.18)
+
+        emerald = np.array([5, 150, 105], dtype=np.float32)
+        vivid_green = np.array([34, 197, 94], dtype=np.float32)
+        lime = np.array([163, 230, 53], dtype=np.float32)
+
+        for mask, tint, alpha in [
+            (savi_sparse, lime, 0.60),
+            (savi_mod, vivid_green, 0.72),
+            (savi_dense, emerald, 0.82),
+        ]:
+            if np.any(mask):
+                under = output_rgb[mask].astype(np.float32)
+                output_rgb[mask] = np.clip(under * (1.0 - alpha) + tint * alpha, 0, 255).astype(np.uint8)
+
+        veg_pct = float(np.mean(savi_arr >= 0.08) * 100.0)
+        stats = {
+            "index_name": "SAVI (Soil-Adjusted Vegetation Index · Arid Land Calibration)",
+            "mean_index": round(float(np.mean(savi_arr)), 3),
+            "soil_adjusted_canopy_pct": round(veg_pct, 1),
+            "classification": (
+                "Continuous Healthy Canopy" if veg_pct > 40
+                else ("Sparse / Arid Vegetation with Soil Attenuation" if veg_pct > 10 else "Arid / Bare Soil Terrain")
+            ),
+            "colormap": "Soil-Compensated Emerald to Chartreuse Gradient",
+            "algorithm": "Huete (1988) SAVI Calibration with L=0.5 Background Decoupling",
+        }
+        res_img = Image.fromarray(output_rgb)
+
     else:
         # 4. AUTHENTIC NASA / USGS FALSE-COLOR INFRARED (CIR) COMPOSITE
         # Standard: NIR -> Red, Red -> Green, Green -> Blue

@@ -80,7 +80,7 @@ export const OrbitalHeader: React.FC<OrbitalHeaderProps> = ({ status: propStatus
             <line x1="9" y1="9" x2="15" y2="9" />
             <line x1="9" y1="15" x2="15" y2="15" />
           </svg>
-          <span>{liveStatus?.adaptation || 'OPENROUTER CLOUD VLM'}</span>
+          <span>{liveStatus?.adaptation || 'ORBITAL VLM INFERENCE CORE'}</span>
         </div>
 
         <div className="pill-badge">
