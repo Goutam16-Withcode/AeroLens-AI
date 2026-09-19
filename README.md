@@ -1,5 +1,5 @@
 ---
-title: SATQUERY AI // AUTONOMOUS MULTISPECTRAL AGENTIC VLM // NEXT.JS + FASTAPI COCKPIT
+title: AeroLens AI — Autonomous Orbital Earth Observation Cockpit
 emoji: 🛰️
 colorFrom: blue
 colorTo: indigo
@@ -8,7 +8,7 @@ app_port: 3000
 pinned: false
 ---
 
-# 🛰️ SATQUERY AI // AUTONOMOUS MULTISPECTRAL AGENTIC VLM // NEXT.JS + FASTAPI COCKPIT
+# 🛰️ AeroLens AI — Autonomous Orbital Earth Observation Cockpit
 
 [![Next.js 15](https://img.shields.io/badge/Next.js-15%20Turbopack-black?logo=next.js&logoColor=white)](https://nextjs.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.110%2B-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
@@ -16,7 +16,7 @@ pinned: false
 [![Docker Ready](https://img.shields.io/badge/Docker-Containerized-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**SATQUERY AI** is an advanced aerospace ground station cockpit and autonomous multimodal remote sensing agentic platform. Built for mission-critical satellite earth observation, bi-temporal disaster monitoring, and multi-sensor intelligence, it unites state-of-the-art **Vision-Language Models (VLMs)**, **USGS & NASA scientific spectral band math**, and a high-performance **Next.js 15 + FastAPI** architecture.
+**AeroLens AI** is an advanced aerospace ground station cockpit and autonomous multimodal remote sensing agentic platform. Built for mission-critical satellite earth observation, bi-temporal disaster monitoring, and multi-sensor intelligence, it unites state-of-the-art **Vision-Language Models (VLMs)**, **USGS & NASA scientific spectral band math**, and a high-performance **Next.js 15 + FastAPI** architecture.
 
 ---
 
@@ -24,7 +24,7 @@ pinned: false
 
 ```
  ┌────────────────────────────────────────────────────────────────────────────────────────┐
- │                                   SATQUERY AI COCKPIT                                  │
+ │                                   AEROLENS AI COCKPIT                                  │
  ├───────────────────┬───────────────────┬────────────────────┬───────────────────────────┤
  │ [01] EVIDENCE     │ [02] BAND MATH    │ [03] COMPARISON    │ [04] 3X LOUPE & CLAHE     │
  │ 4-Slot Multi-     │ NDVI, NDWI, NDBI, │ Bi-temporal swipe, │ Multi-scale (2X/4X/8X),   │
