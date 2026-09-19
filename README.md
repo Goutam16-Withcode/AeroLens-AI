@@ -1,13 +1,3 @@
----
-title: AeroLens AI — Autonomous Orbital Earth Observation Cockpit
-emoji: 🛰️
-colorFrom: blue
-colorTo: indigo
-sdk: docker
-app_port: 3000
-pinned: false
----
-
 # 🛰️ AeroLens AI — Autonomous Orbital Earth Observation Cockpit
 
 [![Next.js 15](https://img.shields.io/badge/Next.js-15%20Turbopack-black?logo=next.js&logoColor=white)](https://nextjs.org/)
