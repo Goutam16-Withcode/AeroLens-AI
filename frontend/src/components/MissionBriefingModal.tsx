@@ -1,7 +1,8 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { AnalysisResponse } from '../types/satquery';
+import { generateMissionBriefingPdf } from '@/lib/pdf/generateBriefing';
 
 interface MissionBriefingModalProps {
   isOpen: boolean;
@@ -16,10 +17,27 @@ export const MissionBriefingModal: React.FC<MissionBriefingModalProps> = ({
   query,
   response,
 }) => {
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [progress, setProgress] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
   if (!isOpen || !response) return null;
 
-  const handlePrint = () => {
-    window.print();
+  const handleDownloadPdf = async () => {
+    setError(null);
+    setIsGenerating(true);
+    try {
+      await generateMissionBriefingPdf({
+        query,
+        response,
+        onProgress: setProgress,
+      });
+    } catch (err) {
+      setError((err as Error).message || 'Could not generate the PDF briefing. Please try again.');
+    } finally {
+      setIsGenerating(false);
+      setProgress(null);
+    }
   };
 
   return (
@@ -118,36 +136,46 @@ export const MissionBriefingModal: React.FC<MissionBriefingModalProps> = ({
         </div>
 
         {/* Telemetry Footer */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border-subtle)', paddingTop: '16px', marginTop: '24px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border-subtle)', paddingTop: '16px', marginTop: '24px', flexWrap: 'wrap', gap: '10px' }}>
           <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-muted)' }}>
             CONFIDENCE: {Math.round((response.trace?.confidence || 0.9) * 100)}% · LATENCY: {response.trace?.elapsed_seconds.toFixed(2)}s
           </div>
 
-          <button
-            onClick={handlePrint}
-            style={{
-              padding: '9px 18px',
-              background: 'var(--accent-amber)',
-              border: 'none',
-              borderRadius: '6px',
-              color: '#ffffff',
-              fontFamily: 'var(--font-hud)',
-              fontSize: '12px',
-              fontWeight: 700,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              boxShadow: '0 2px 8px rgba(194, 109, 46, 0.3)',
-            }}
-          >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polyline points="6 9 6 2 18 2 18 9" />
-              <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
-              <rect x="6" y="14" width="12" height="8" />
-            </svg>
-            <span>PRINT / EXPORT PDF BRIEFING</span>
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            {error && (
+              <span style={{ fontSize: '11px', color: '#dc2626', fontFamily: 'var(--font-mono)' }}>{error}</span>
+            )}
+            {isGenerating && progress && (
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>{progress}</span>
+            )}
+            <button
+              onClick={handleDownloadPdf}
+              disabled={isGenerating}
+              style={{
+                padding: '9px 18px',
+                background: 'var(--accent-amber)',
+                border: 'none',
+                borderRadius: '6px',
+                color: '#ffffff',
+                fontFamily: 'var(--font-hud)',
+                fontSize: '12px',
+                fontWeight: 700,
+                cursor: isGenerating ? 'not-allowed' : 'pointer',
+                opacity: isGenerating ? 0.7 : 1,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                boxShadow: '0 2px 8px rgba(194, 109, 46, 0.3)',
+              }}
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="6 9 6 2 18 2 18 9" />
+                <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+                <rect x="6" y="14" width="12" height="8" />
+              </svg>
+              <span>{isGenerating ? 'GENERATING PDF…' : 'DOWNLOAD PDF BRIEFING'}</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>

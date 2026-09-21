@@ -1,5 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import { AuthProvider } from '@/contexts/AuthContext';
+import { AuthGate } from '@/components/auth/AuthGate';
 
 export const metadata: Metadata = {
   title: 'AeroLens AI — Autonomous Orbital Earth Observation Cockpit',
@@ -21,7 +23,11 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body>{children}</body>
+      <body>
+        <AuthProvider>
+          <AuthGate>{children}</AuthGate>
+        </AuthProvider>
+      </body>
     </html>
   );
 }
