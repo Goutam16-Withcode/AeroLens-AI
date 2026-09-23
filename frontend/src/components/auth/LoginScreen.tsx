@@ -1,7 +1,14 @@
 'use client';
 
 import React, { useState } from 'react';
+import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
+
+// Fixed demo/test account so anyone can try the console without creating
+// their own account. This is a deliberately public, low-privilege account —
+// never reuse this pattern for a real user's credentials.
+const GUEST_EMAIL = 'aerolens.test@gmail.com';
+const GUEST_PASSWORD = 'A1rLens!Cloud_92#';
 
 export const LoginScreen: React.FC = () => {
   const { signInWithGoogle, signInWithEmail, signUpWithEmail, error, clearError, firebaseReady } = useAuth();
@@ -9,6 +16,7 @@ export const LoginScreen: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [guestSubmitting, setGuestSubmitting] = useState(false);
 
   const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,6 +35,20 @@ export const LoginScreen: React.FC = () => {
     }
   };
 
+  const handleGuestLogin = async () => {
+    clearError();
+    setGuestSubmitting(true);
+    try {
+      await signInWithEmail(GUEST_EMAIL, GUEST_PASSWORD);
+    } catch {
+      /* error already surfaced via context */
+    } finally {
+      setGuestSubmitting(false);
+    }
+  };
+
+  const anyLoading = submitting || guestSubmitting;
+
   return (
     <div
       style={{
@@ -44,6 +66,22 @@ export const LoginScreen: React.FC = () => {
         className="panel-card"
         style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: '380px', padding: '32px' }}
       >
+        <Link
+          href="/"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '5px',
+            fontFamily: 'var(--font-mono)',
+            fontSize: '11px',
+            color: 'var(--text-muted)',
+            textDecoration: 'none',
+            marginBottom: '14px',
+          }}
+        >
+          ← Back to home
+        </Link>
+
         <div style={{ textAlign: 'center', marginBottom: '22px' }}>
           <div style={{ fontFamily: 'var(--font-hud)', fontSize: '20px', fontWeight: 700, color: 'var(--text-pure)' }}>
             🛰️ AeroLens AI
@@ -89,10 +127,10 @@ export const LoginScreen: React.FC = () => {
 
         <button
           type="button"
-          disabled={!firebaseReady}
+          disabled={!firebaseReady || anyLoading}
           onClick={() => {
             clearError();
-            signInWithGoogle().catch(() => {});
+            signInWithGoogle().catch(() => { });
           }}
           style={{
             width: '100%',
@@ -103,12 +141,33 @@ export const LoginScreen: React.FC = () => {
             color: 'var(--text-main)',
             fontWeight: 600,
             fontSize: '13px',
-            cursor: firebaseReady ? 'pointer' : 'not-allowed',
-            opacity: firebaseReady ? 1 : 0.5,
-            marginBottom: '16px',
+            cursor: firebaseReady && !anyLoading ? 'pointer' : 'not-allowed',
+            opacity: firebaseReady && !anyLoading ? 1 : 0.5,
+            marginBottom: '10px',
           }}
         >
           Continue with Google
+        </button>
+
+        <button
+          type="button"
+          disabled={!firebaseReady || anyLoading}
+          onClick={handleGuestLogin}
+          style={{
+            width: '100%',
+            padding: '11px',
+            borderRadius: 'var(--radius-md)',
+            border: '1px solid var(--accent-amber-border)',
+            background: 'var(--accent-amber-subtle)',
+            color: 'var(--accent-amber)',
+            fontWeight: 700,
+            fontSize: '13px',
+            cursor: firebaseReady && !anyLoading ? 'pointer' : 'not-allowed',
+            opacity: firebaseReady && !anyLoading ? 1 : 0.5,
+            marginBottom: '16px',
+          }}
+        >
+          {guestSubmitting ? 'Signing in…' : 'Continue as Guest'}
         </button>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: '12px 0', color: 'var(--text-muted)', fontSize: '11px' }}>
@@ -137,7 +196,7 @@ export const LoginScreen: React.FC = () => {
           />
           <button
             type="submit"
-            disabled={!firebaseReady || submitting}
+            disabled={!firebaseReady || anyLoading}
             style={{
               width: '100%',
               marginTop: '14px',
@@ -148,8 +207,8 @@ export const LoginScreen: React.FC = () => {
               color: '#fff',
               fontWeight: 700,
               fontSize: '13px',
-              cursor: firebaseReady && !submitting ? 'pointer' : 'not-allowed',
-              opacity: firebaseReady && !submitting ? 1 : 0.6,
+              cursor: firebaseReady && !anyLoading ? 'pointer' : 'not-allowed',
+              opacity: firebaseReady && !anyLoading ? 1 : 0.6,
             }}
           >
             {submitting ? 'Please wait…' : mode === 'signin' ? 'Sign In' : 'Create Account'}

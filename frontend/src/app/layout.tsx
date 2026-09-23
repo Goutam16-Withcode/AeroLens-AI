@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { AuthProvider } from '@/contexts/AuthContext';
-import { AuthGate } from '@/components/auth/AuthGate';
 
 export const metadata: Metadata = {
   title: 'AeroLens AI — Autonomous Orbital Earth Observation Cockpit',
@@ -24,9 +23,11 @@ export default function RootLayout({
         />
       </head>
       <body>
-        <AuthProvider>
-          <AuthGate>{children}</AuthGate>
-        </AuthProvider>
+        {/* AuthProvider stays global (cheap, needed for the landing page's nav
+            to know whether to say "Launch Console" vs "Sign In"), but the
+            hard AuthGate now lives only in app/cockpit/layout.tsx — the
+            landing page itself is public. */}
+        <AuthProvider>{children}</AuthProvider>
       </body>
     </html>
   );
